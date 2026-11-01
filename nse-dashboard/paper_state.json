@@ -1,0 +1,46 @@
+{
+  "cash": 981354.0,
+  "initial_capital": 1000000.0,
+  "positions": {
+    "HINDUNILVR.NS": {
+      "symbol": "HINDUNILVR.NS",
+      "qty": 10,
+      "avg_price": 1864.6,
+      "current_price": 1864.6,
+      "pnl": 0.0,
+      "pnl_pct": 0.0,
+      "side": "BUY",
+      "stop_loss": null,
+      "target": null,
+      "algo_name": "RSI Oversold Mean Reversion",
+      "entry_time": "2026-11-01 12:17:27"
+    }
+  },
+  "closed_trades": [],
+  "orders": [
+    {
+      "id": "ORD-1793515647501",
+      "symbol": "HINDUNILVR.NS",
+      "side": "BUY",
+      "qty": 10,
+      "price": 1864.6,
+      "value": 18646.0,
+      "algo_name": "RSI Oversold Mean Reversion",
+      "timestamp": "2026-11-01 12:17:27",
+      "status": "EXECUTED"
+    }
+  ],
+  "stats": {
+    "total_trades": 0,
+    "winning_trades": 0,
+    "losing_trades": 0,
+    "win_rate": 0.0,
+    "total_pnl": 0.0,
+    "total_pnl_pct": 0.0,
+    "unrealized_pnl": 0.0,
+    "realized_pnl": 0,
+    "portfolio_value": 1000000.0,
+    "cash_balance": 981354.0,
+    "profit_factor": 1.0
+  }
+}
