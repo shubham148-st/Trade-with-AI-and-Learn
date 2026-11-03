@@ -1,3 +1,6 @@
 /graphify-out
 /.agents
 GEMINI.md
+__pycache__/
+*.py[cod]
+*$py.class

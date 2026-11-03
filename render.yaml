@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: tail-quant-terminal
+    runtime: python
+    buildCommand: "npm --prefix frontend install && npm --prefix frontend run build && pip install -r nse-dashboard/requirements.txt"
+    startCommand: "gunicorn --chdir nse-dashboard app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120"
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9

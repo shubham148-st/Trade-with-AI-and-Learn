@@ -8,13 +8,15 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 from flask_cors import CORS
 import yfinance as yf
 import pandas as pd
 
 app = Flask(__name__)
 CORS(app)
+
+FRONTEND_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
 
 CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quotes_cache.json")
 _QUOTES_CACHE = {
@@ -92,15 +94,21 @@ def _safe_float(val):
 
 # ── Routes ──────────────────────────────────────────────────────────────────
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_client(path):
+    # Don't intercept API routes
+    if path.startswith("api"):
+        return jsonify({"error": "Endpoint not found"}), 404
 
+    # Serve static assets from frontend/dist if they exist
+    if path and os.path.exists(os.path.join(FRONTEND_DIST, path)):
+        return send_from_directory(FRONTEND_DIST, path)
 
-@app.route("/<symbol_slug>")
-def stock_slug_page(symbol_slug):
-    if symbol_slug.startswith("api") or symbol_slug.startswith("static"):
-        return jsonify({"error": "Not found"}), 404
+    # SPA index fallback for client-side routing (/stocks/*, /AI/*, /paper-trading, etc.)
+    if os.path.exists(os.path.join(FRONTEND_DIST, "index.html")):
+        return send_from_directory(FRONTEND_DIST, "index.html")
+
     return render_template("index.html")
 
 
@@ -503,5 +511,7 @@ def paper_reset():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5500, threaded=True)
+    port = int(os.environ.get("PORT", 5500))
+    debug = os.environ.get("FLASK_ENV") == "development"
+    app.run(host="0.0.0.0", port=port, debug=debug, threaded=True)
 
