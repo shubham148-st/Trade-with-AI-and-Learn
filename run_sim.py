@@ -110,9 +110,7 @@ def main():
     app_py = os.path.join(BACKEND_DIR, "app.py")
     flask_proc = subprocess.Popen(
         [sys.executable, app_py],
-        cwd=BACKEND_DIR,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT
+        cwd=BACKEND_DIR
     )
     processes.append(flask_proc)
 
@@ -121,9 +119,7 @@ def main():
     npx_cmd = "npx.cmd" if sys.platform == "win32" else "npx"
     vite_proc = subprocess.Popen(
         [npx_cmd, "vite", "--port", "5173", "--host", "127.0.0.1"],
-        cwd=FRONTEND_DIR,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT
+        cwd=FRONTEND_DIR
     )
     processes.append(vite_proc)
 

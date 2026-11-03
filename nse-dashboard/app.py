@@ -4,6 +4,9 @@ Serves real-time and historical NSE data from Yahoo Finance.
 """
 
 import json
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
@@ -12,6 +15,23 @@ import pandas as pd
 
 app = Flask(__name__)
 CORS(app)
+
+CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quotes_cache.json")
+_QUOTES_CACHE = {
+    "timestamp": 0,
+    "data": []
+}
+_HISTORY_CACHE = {}  # key: (symbol, period, interval) -> { "timestamp": float, "payload": dict }
+
+if os.path.exists(CACHE_FILE):
+    try:
+        with open(CACHE_FILE, "r") as f:
+            saved = json.load(f)
+            if isinstance(saved, list) and len(saved) > 0:
+                _QUOTES_CACHE["data"] = saved
+                _QUOTES_CACHE["timestamp"] = time.time()
+    except Exception:
+        pass
 
 # ── Popular NSE Stocks (Yahoo uses .NS suffix) ──────────────────────────────
 NSE_STOCKS = {
@@ -39,7 +59,7 @@ NSE_STOCKS = {
     "WIPRO.NS": "Wipro",
     "BAJFINANCE.NS": "Bajaj Finance",
     "HCLTECH.NS": "HCL Technologies",
-    "TATAMOTORS.NS": "Tata Motors",
+    "M&M.NS": "Mahindra & Mahindra",
     "ADANIENT.NS": "Adani Enterprises",
     "TATASTEEL.NS": "Tata Steel",
     "POWERGRID.NS": "Power Grid Corp",
@@ -54,7 +74,7 @@ SECTOR_MAP = {
     "IT": ["TCS.NS", "INFY.NS", "WIPRO.NS", "HCLTECH.NS", "TECHM.NS"],
     "Banking": ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "KOTAKBANK.NS", "AXISBANK.NS"],
     "Energy": ["RELIANCE.NS", "ONGC.NS", "NTPC.NS", "POWERGRID.NS", "COALINDIA.NS"],
-    "Auto": ["MARUTI.NS", "TATAMOTORS.NS"],
+    "Auto": ["MARUTI.NS", "M&M.NS"],
     "FMCG": ["HINDUNILVR.NS", "ITC.NS"],
     "Pharma": ["SUNPHARMA.NS"],
     "Metals": ["TATASTEEL.NS", "JSWSTEEL.NS"],
@@ -74,6 +94,13 @@ def _safe_float(val):
 
 @app.route("/")
 def index():
+    return render_template("index.html")
+
+
+@app.route("/<symbol_slug>")
+def stock_slug_page(symbol_slug):
+    if symbol_slug.startswith("api") or symbol_slug.startswith("static"):
+        return jsonify({"error": "Not found"}), 404
     return render_template("index.html")
 
 
@@ -129,50 +156,79 @@ def get_quote(symbol):
 
 @app.route("/api/batch_quotes")
 def batch_quotes():
-    """Get quick quotes for all tracked stocks (for the ticker board)."""
-    symbols = list(NSE_STOCKS.keys())
-    results = []
-    try:
-        tickers = yf.Tickers(" ".join(symbols))
-        for sym in symbols:
-            try:
-                t = tickers.tickers[sym]
-                fi = t.fast_info
-                price = _safe_float(getattr(fi, "last_price", None))
-                prev = _safe_float(getattr(fi, "previous_close", None))
-                change = round(price - prev, 2) if price and prev else None
-                change_pct = round((change / prev) * 100, 2) if change and prev else None
-                results.append({
-                    "symbol": sym,
-                    "name": NSE_STOCKS[sym],
-                    "price": price,
-                    "change": change,
-                    "changePct": change_pct,
-                })
-            except Exception:
-                results.append({
-                    "symbol": sym,
-                    "name": NSE_STOCKS[sym],
-                    "price": None,
-                    "change": None,
-                    "changePct": None,
-                })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    """Get quick quotes for all tracked stocks. Fast with parallel threads and cache."""
+    force = request.args.get("force", "0") == "1"
+    now = time.time()
 
-    return jsonify(results)
+    if not force and _QUOTES_CACHE["data"] and (now - _QUOTES_CACHE["timestamp"] < 60):
+        return jsonify(_QUOTES_CACHE["data"])
+
+    symbols = list(NSE_STOCKS.keys())
+
+    def fetch_single(sym):
+        try:
+            t = yf.Ticker(sym)
+            fi = t.fast_info
+            price = _safe_float(getattr(fi, "last_price", None))
+            prev = _safe_float(getattr(fi, "previous_close", None))
+            change = round(price - prev, 2) if price and prev else None
+            change_pct = round((change / prev) * 100, 2) if change and prev else None
+            return {
+                "symbol": sym,
+                "name": NSE_STOCKS[sym],
+                "price": price,
+                "change": change,
+                "changePct": change_pct,
+            }
+        except Exception:
+            return {
+                "symbol": sym,
+                "name": NSE_STOCKS[sym],
+                "price": None,
+                "change": None,
+                "changePct": None,
+            }
+
+    try:
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            results = list(executor.map(fetch_single, symbols))
+
+        has_prices = any(r.get("price") is not None for r in results)
+        if has_prices:
+            _QUOTES_CACHE["data"] = results
+            _QUOTES_CACHE["timestamp"] = now
+            try:
+                with open(CACHE_FILE, "w") as f:
+                    json.dump(results, f)
+            except Exception:
+                pass
+            return jsonify(results)
+        elif _QUOTES_CACHE["data"]:
+            return jsonify(_QUOTES_CACHE["data"])
+        return jsonify(results)
+    except Exception as e:
+        if _QUOTES_CACHE["data"]:
+            return jsonify(_QUOTES_CACHE["data"])
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/history/<symbol>")
 def get_history(symbol):
     """
-    Get historical OHLCV data.
+    Get historical OHLCV data with 5-minute cache to protect against Yahoo Finance rate limits.
     Query params:
       period  - 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max  (default: 6mo)
       interval - 1m,5m,15m,30m,1h,1d,1wk,1mo             (default: 1d)
     """
     period = request.args.get("period", "6mo")
     interval = request.args.get("interval", "1d")
+    cache_key = (symbol, period, interval)
+    now = time.time()
+
+    # For live intraday (1d), cache for 20s so new ticks stream live. For historical, cache for 300s.
+    ttl = 20 if period == "1d" else 300
+    if cache_key in _HISTORY_CACHE and (now - _HISTORY_CACHE[cache_key]["timestamp"] < ttl):
+        return jsonify(_HISTORY_CACHE[cache_key]["payload"])
 
     try:
         ticker = yf.Ticker(symbol)
@@ -183,23 +239,39 @@ def get_history(symbol):
 
         data = []
         for ts, row in hist.iterrows():
+            close_raw = row["Close"]
+            open_raw = row["Open"]
+            if pd.isna(close_raw) or pd.isna(open_raw) or close_raw is None:
+                continue
+            close_val = _safe_float(close_raw)
+            open_val = _safe_float(open_raw)
+            if close_val is None or close_val <= 0:
+                continue
+
             data.append({
+                "time": int(ts.timestamp()) if interval in ("1m", "5m", "15m", "30m", "1h") else ts.strftime("%Y-%m-%d"),
                 "date": ts.strftime("%Y-%m-%d %H:%M") if interval in ("1m", "5m", "15m", "30m", "1h") else ts.strftime("%Y-%m-%d"),
-                "open": _safe_float(row["Open"]),
-                "high": _safe_float(row["High"]),
-                "low": _safe_float(row["Low"]),
-                "close": _safe_float(row["Close"]),
+                "timestamp": int(ts.timestamp()),
+                "open": open_val or close_val,
+                "high": _safe_float(row["High"]) or close_val,
+                "low": _safe_float(row["Low"]) or close_val,
+                "close": close_val,
                 "volume": int(row["Volume"]) if not pd.isna(row["Volume"]) else 0,
             })
 
-        return jsonify({
+        payload = {
             "symbol": symbol,
             "name": NSE_STOCKS.get(symbol, symbol),
             "period": period,
             "interval": interval,
             "data": data,
-        })
+        }
+        _HISTORY_CACHE[cache_key] = {"timestamp": now, "payload": payload}
+        return jsonify(payload)
     except Exception as e:
+        if cache_key in _HISTORY_CACHE:
+            return jsonify(_HISTORY_CACHE[cache_key]["payload"])
+        return jsonify({"error": str(e)}), 500
         return jsonify({"error": str(e)}), 500
 
 
@@ -431,5 +503,5 @@ def paper_reset():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5500)
+    app.run(debug=True, port=5500, threaded=True)
 
