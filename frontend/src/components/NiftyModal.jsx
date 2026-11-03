@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, TrendingUp, TrendingDown, Maximize2, RefreshCw, Layers, Calendar } from 'lucide-react';
+import { 
+  X, 
+  TrendingUp, 
+  TrendingDown, 
+  Maximize2, 
+  RefreshCw, 
+  Layers, 
+  Calendar,
+  SlidersHorizontal,
+  Check
+} from 'lucide-react';
 import { 
   createChart, 
   ColorType, 
@@ -19,10 +29,13 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
   const mainSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const cachedDataRef = useRef({ candles: [], lines: [], volumes: [] });
+  const terminalMenuRef = useRef(null);
 
   const [period, setPeriod] = useState('1d'); // Default view is 1D
   const [interval, setInterval] = useState('1m'); // 1m live feed tick interval
-  const [chartType, setChartType] = useState('line-dots'); // Default: Line & Dots
+  const [chartType, setChartType] = useState('line-dots'); // Default: Line
+  const [showVolume, setShowVolume] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [latestData, setLatestData] = useState(null);
@@ -30,19 +43,36 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
 
   const periods = [
     { label: '1D', period: '1d', interval: '1m' },
-    { label: '5D', period: '5d', interval: '5m' },
+    { label: '1W', period: '5d', interval: '5m' },
     { label: '1M', period: '1mo', interval: '1d' },
+    { label: '3M', period: '3mo', interval: '1d' },
     { label: '6M', period: '6mo', interval: '1d' },
     { label: '1Y', period: '1y', interval: '1d' },
+    { label: '3Y', period: '3y', interval: '1wk' },
+    { label: '5Y', period: '5y', interval: '1wk' },
+    { label: 'All', period: 'max', interval: '1mo' },
   ];
 
   const famousGraphOptions = [
-    { id: 'line-dots', label: '📈 Line & Dots (Default)' },
+    { id: 'line-dots', label: '📈 Line Chart' },
     { id: 'candlestick', label: '🕯️ Japanese Candlestick' },
     { id: 'area', label: '🌊 Area / Mountain' },
     { id: 'bar', label: '📊 OHLC Bars' },
     { id: 'baseline', label: '⚖️ Baseline Delta' },
   ];
+
+  // Close Terminal popover on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (terminalMenuRef.current && !terminalMenuRef.current.contains(e.target)) {
+        setTerminalOpen(false);
+      }
+    };
+    if (terminalOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [terminalOpen]);
 
   const createMainSeries = (chart, type) => {
     if (mainSeriesRef.current) {
@@ -59,10 +89,9 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
       series = chart.addSeries(LineSeries, {
         color: '#00d4aa',
         lineWidth: 2,
-        pointMarkersVisible: true,
-        pointMarkersRadius: 4,
+        pointMarkersVisible: false,
         crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 6,
+        crosshairMarkerRadius: 5,
         crosshairMarkerBorderColor: '#ffffff',
         crosshairMarkerBackgroundColor: '#00d4aa',
       });
@@ -78,13 +107,12 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
     } else if (type === 'area') {
       series = chart.addSeries(AreaSeries, {
         lineColor: '#00d4aa',
-        topColor: 'rgba(0, 212, 170, 0.45)',
+        topColor: 'rgba(0, 212, 170, 0.3)',
         bottomColor: 'rgba(0, 212, 170, 0.02)',
         lineWidth: 2,
-        pointMarkersVisible: true,
-        pointMarkersRadius: 3,
+        pointMarkersVisible: false,
         crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 6,
+        crosshairMarkerRadius: 5,
         crosshairMarkerBorderColor: '#ffffff',
         crosshairMarkerBackgroundColor: '#00d4aa',
       });
@@ -99,15 +127,14 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
         baseValue: { type: 'price', price: baseVal },
         topLineColor: '#2ed573',
         bottomLineColor: '#ff4757',
-        topFillColor1: 'rgba(46, 213, 115, 0.35)',
-        topFillColor2: 'rgba(46, 213, 115, 0.05)',
-        bottomFillColor1: 'rgba(255, 71, 87, 0.05)',
-        bottomFillColor2: 'rgba(255, 71, 87, 0.35)',
+        topFillColor1: 'rgba(46, 213, 115, 0.25)',
+        topFillColor2: 'rgba(46, 213, 115, 0.02)',
+        bottomFillColor1: 'rgba(255, 71, 87, 0.02)',
+        bottomFillColor2: 'rgba(255, 71, 87, 0.25)',
         lineWidth: 2,
-        pointMarkersVisible: true,
-        pointMarkersRadius: 3,
+        pointMarkersVisible: false,
         crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 6,
+        crosshairMarkerRadius: 5,
       });
     }
 
@@ -261,6 +288,7 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
         priceFormat: { type: 'volume' },
         priceScaleId: '',
         scaleMargins: { top: 0.8, bottom: 0 },
+        visible: chartType === 'candlestick' && showVolume,
       });
 
       chartInstanceRef.current = chart;
@@ -281,12 +309,18 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
         }
 
         let hoveredPrice = null;
+        let openVal = null, highVal = null, lowVal = null, closeVal = null;
         const mainData = param.seriesData.get(mainSeriesRef.current);
         if (mainData) {
           if (typeof mainData.value === 'number') {
             hoveredPrice = mainData.value;
+            closeVal = mainData.value;
           } else if (typeof mainData.close === 'number') {
             hoveredPrice = mainData.close;
+            closeVal = mainData.close;
+            openVal = mainData.open;
+            highVal = mainData.high;
+            lowVal = mainData.low;
           }
         }
 
@@ -318,6 +352,10 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
 
         setHoveredPoint({
           price: hoveredPrice,
+          open: openVal ?? hoveredPrice,
+          high: highVal ?? hoveredPrice,
+          low: lowVal ?? hoveredPrice,
+          close: closeVal ?? hoveredPrice,
           change: diff,
           changePct: diffPct,
           volume: hoveredVolume,
@@ -358,10 +396,48 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
     }
   };
 
+  const handleToggleLineCandle = () => {
+    if (chartType === 'candlestick') {
+      handleChartTypeChange('line-dots');
+      setShowVolume(false);
+      if (volumeSeriesRef.current) {
+        volumeSeriesRef.current.applyOptions({ visible: false });
+      }
+    } else {
+      handleChartTypeChange('candlestick');
+      setShowVolume(true);
+      if (volumeSeriesRef.current) {
+        volumeSeriesRef.current.applyOptions({ visible: true });
+      }
+    }
+  };
+
+  const handleVolumeToggle = (visible) => {
+    setShowVolume(visible);
+    if (volumeSeriesRef.current) {
+      volumeSeriesRef.current.applyOptions({ visible });
+    }
+  };
+
   const displayPrice = hoveredPoint ? hoveredPoint.price : latestData?.close;
   const displayChange = hoveredPoint ? hoveredPoint.change : latestData?.change;
   const displayChangePct = hoveredPoint ? hoveredPoint.changePct : latestData?.changePct;
   const isUp = (displayChangePct ?? 0) >= 0;
+
+  const latestCandle = cachedDataRef.current.candles.slice(-1)[0] || {
+    open: displayPrice || 0,
+    high: displayPrice || 0,
+    low: displayPrice || 0,
+    close: displayPrice || 0,
+    volume: 0
+  };
+  const activeOhlc = hoveredPoint ? {
+    open: hoveredPoint.open ?? hoveredPoint.price,
+    high: hoveredPoint.high ?? hoveredPoint.price,
+    low: hoveredPoint.low ?? hoveredPoint.price,
+    close: hoveredPoint.close ?? hoveredPoint.price,
+    volume: hoveredPoint.volume
+  } : latestCandle;
 
   return (
     <div style={{
@@ -480,84 +556,51 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
           </div>
         </div>
 
-        {/* Period Selector Tabs & Famous Graph Selector Dropdown */}
-        <div style={{
-          padding: '0.75rem 1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          background: 'var(--bg-bar, #12141a)',
-          borderBottom: '1px solid var(--border, #2a2d35)',
-          flexWrap: 'wrap',
-          gap: '0.75rem'
-        }}>
-          {/* Timeframe Buttons */}
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {periods.map(p => (
-              <button
-                key={p.label}
-                onClick={() => handlePeriodChange(p.period, p.interval)}
-                style={{
-                  background: period === p.period ? 'var(--accent, #00d4aa)' : 'rgba(255,255,255,0.05)',
-                  color: period === p.period ? '#0f1117' : 'var(--text-main, #f0f2f5)',
-                  fontWeight: 700,
-                  fontSize: '0.78rem',
-                  padding: '5px 12px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+        {/* Top Candlestick OHLC + Volume Bar (Image 2) */}
+        {chartType === 'candlestick' && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: '16px',
+            padding: '8px 16px',
+            background: 'var(--bg-bar, #12141a)',
+            borderBottom: '1px solid var(--border, #2a2d35)',
+            fontSize: '0.78rem',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted, #888888)' }}>
+              <span style={{ fontWeight: 600 }}>Price</span>
+              <span>O <strong style={{ color: '#d1d5db' }}>₹{Number(activeOhlc.open || 0).toFixed(2)}</strong></span>
+              <span>H <strong style={{ color: 'var(--green, #2ed573)' }}>₹{Number(activeOhlc.high || 0).toFixed(2)}</strong></span>
+              <span>L <strong style={{ color: 'var(--red, #ff4757)' }}>₹{Number(activeOhlc.low || 0).toFixed(2)}</strong></span>
+              <span>C <strong style={{ color: '#d1d5db' }}>₹{Number(activeOhlc.close || 0).toFixed(2)}</strong></span>
+            </div>
 
-          {/* Famous Graphs Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
+            <label style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: 'var(--bg-secondary, #22252d)',
-              border: '1px solid var(--border, #2a2d35)',
-              borderRadius: '7px',
-              padding: '4px 8px'
+              cursor: 'pointer',
+              userSelect: 'none',
+              color: showVolume ? 'var(--accent, #00d4aa)' : 'var(--text-muted, #888888)',
+              fontWeight: 600
             }}>
-              <Layers size={14} color="var(--accent, #00d4aa)" />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)', fontWeight: 600 }}>Graph:</span>
-              <select
-                value={chartType}
-                onChange={(e) => handleChartTypeChange(e.target.value)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--accent, #00d4aa)',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  outline: 'none'
-                }}
-              >
-                {famousGraphOptions.map(opt => (
-                  <option 
-                    key={opt.id} 
-                    value={opt.id} 
-                    style={{ background: '#1a1d23', color: '#f0f2f5' }}
-                  >
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+              <input
+                type="checkbox"
+                checked={showVolume}
+                onChange={(e) => handleVolumeToggle(e.target.checked)}
+                style={{ accentColor: '#00d4aa', cursor: 'pointer' }}
+              />
+              <span>Volume <strong style={{ color: '#d1d5db' }}>{Number(activeOhlc.volume || 0).toLocaleString('en-IN')}</strong></span>
+            </label>
           </div>
-        </div>
+        )}
 
         {/* Chart View with Groww Floating Info Overlay */}
         <div style={{ position: 'relative', width: '100%', height: '420px', background: '#12141a' }}>
           
-          {hoveredPoint && (
+          {chartType !== 'candlestick' && hoveredPoint && (
             <div style={{
               position: 'absolute',
               top: '12px',
@@ -575,7 +618,7 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
               gap: '14px'
             }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #8b949e)' }}>{hoveredPoint.dateStr}</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>{hoveredPoint.dateStr}</span>
                 <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#f0f2f5' }}>
                   ₹{Number(hoveredPoint.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
@@ -588,8 +631,8 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
                 }}>
                   {hoveredPoint.change >= 0 ? '▲ +' : '▼ '}{Number(hoveredPoint.change).toFixed(2)} ({Math.abs(hoveredPoint.changePct).toFixed(2)}%)
                 </span>
-                {hoveredPoint.volume > 0 && (
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #8b949e)' }}>
+                {showVolume && hoveredPoint.volume > 0 && (
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>
                     Vol: {Number(hoveredPoint.volume).toLocaleString('en-IN')}
                   </span>
                 )}
@@ -610,7 +653,7 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
               gap: '8px'
             }}>
               <RefreshCw size={24} className="spin" color="var(--accent, #00d4aa)" />
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #8b949e)' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #888888)' }}>
                 Fetching live exchange candles...
               </span>
             </div>
@@ -633,6 +676,175 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
           )}
 
           <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
+        </div>
+
+        {/* Bottom Toolbar: Timeframe Pills, Line/Sticks Toggle & Terminal Menu (Images 2 & 3) */}
+        <div 
+          className="chart-toolbar"
+          style={{
+            padding: '0.65rem 1.25rem',
+            borderTop: '1px solid var(--border, #2a2d35)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'var(--bg-bar, #12141a)',
+            flexWrap: 'wrap',
+            gap: '0.6rem'
+          }}
+        >
+          {/* Timeframe Buttons + Line/Candle Switch Button */}
+          <div className="period-selector" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {periods.map(p => (
+              <button
+                key={p.label}
+                onClick={() => handlePeriodChange(p.period, p.interval)}
+                style={{
+                  background: period === p.period ? 'var(--accent, #00d4aa)' : 'rgba(255,255,255,0.04)',
+                  color: period === p.period ? '#0f1117' : 'var(--text-main, #d1d5db)',
+                  fontWeight: 600,
+                  fontSize: '0.74rem',
+                  padding: '4px 10px',
+                  borderRadius: '16px',
+                  border: '1px solid ' + (period === p.period ? 'var(--accent, #00d4aa)' : 'rgba(255,255,255,0.06)'),
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+
+            {/* Quick-switch button: Line <-> Sticks (Image 2 & 3) */}
+            <button
+              onClick={handleToggleLineCandle}
+              title={chartType === 'candlestick' ? 'Switch to Line Chart' : 'Switch to Candlesticks'}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border, #2a2d35)',
+                borderRadius: '16px',
+                padding: '4px 10px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+                marginLeft: '4px'
+              }}
+            >
+              {chartType === 'candlestick' ? (
+                // Green line curve icon (Image 2)
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                  <path d="M1 11L6 6L10 9L17 2" stroke="#2ed573" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              ) : (
+                // Candlestick sticks icon with green/red bars and wicks (Image 3)
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                  <line x1="4" y1="1" x2="4" y2="13" stroke="#2ed573" strokeWidth="1.5" strokeLinecap="round"/>
+                  <rect x="2.5" y="3" width="3" height="6" fill="#2ed573" rx="0.5"/>
+                  <line x1="9" y1="2" x2="9" y2="12" stroke="#ff4757" strokeWidth="1.5" strokeLinecap="round"/>
+                  <rect x="7.5" y="5" width="3" height="5" fill="#ff4757" rx="0.5"/>
+                  <line x1="14" y1="1" x2="14" y2="13" stroke="#2ed573" strokeWidth="1.5" strokeLinecap="round"/>
+                  <rect x="12.5" y="4" width="3" height="6" fill="#2ed573" rx="0.5"/>
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Right: Terminal Menu Button with all other graphs */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ position: 'relative' }} ref={terminalMenuRef}>
+              <button
+                onClick={() => setTerminalOpen(!terminalOpen)}
+                style={{
+                  background: terminalOpen ? 'var(--accent, #00d4aa)' : 'rgba(255, 255, 255, 0.05)',
+                  color: terminalOpen ? '#0f1117' : 'var(--text-main, #d1d5db)',
+                  border: '1px solid var(--border, #2a2d35)',
+                  borderRadius: '16px',
+                  padding: '4px 12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>Terminal</span>
+                <SlidersHorizontal size={13} />
+              </button>
+
+              {terminalOpen && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  right: 0,
+                  marginBottom: '8px',
+                  background: '#1a1d23',
+                  border: '1px solid var(--border, #2a2d35)',
+                  borderRadius: '10px',
+                  boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6)',
+                  padding: '6px',
+                  minWidth: '210px',
+                  zIndex: 50
+                }}>
+                  <div style={{ fontSize: '0.68rem', color: '#888', padding: '6px 10px', fontWeight: 600, textTransform: 'uppercase' }}>
+                    Chart Styles
+                  </div>
+                  {famousGraphOptions.map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        handleChartTypeChange(opt.id);
+                        if (opt.id === 'candlestick') {
+                          setShowVolume(true);
+                          if (volumeSeriesRef.current) volumeSeriesRef.current.applyOptions({ visible: true });
+                        }
+                        setTerminalOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '7px 10px',
+                        borderRadius: '6px',
+                        background: chartType === opt.id ? 'rgba(0, 212, 170, 0.15)' : 'transparent',
+                        color: chartType === opt.id ? 'var(--accent, #00d4aa)' : '#d1d5db',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.78rem',
+                        fontWeight: chartType === opt.id ? 700 : 500,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <span>{opt.label}</span>
+                      {chartType === opt.id && <Check size={14} color="#00d4aa" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => fetchChartData(period, interval, chartType)}
+              title="Refresh Graph"
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--border, #2a2d35)',
+                color: 'var(--text-muted, #888888)',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                fontSize: '0.72rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <RefreshCw size={12} className={loading ? 'spin' : ''} />
+            </button>
+          </div>
         </div>
 
         {/* Modal Footer */}

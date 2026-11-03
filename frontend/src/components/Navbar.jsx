@@ -1,27 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Activity, 
   Bot, 
   Wallet, 
   BookOpen, 
-  TrendingUp,
-  RefreshCw,
-  Search,
-  ChevronDown,
-  Clock
+  TrendingUp, 
+  RefreshCw, 
+  Search, 
+  Clock, 
+  Menu, 
+  X,
+  ChevronRight
 } from 'lucide-react';
 
 export default function Navbar({ 
   activeTab, 
   setActiveTab, 
   onRefresh, 
-  isRefreshing,
-  stocks = [],
+  isRefreshing, 
+  stocks = [], 
   onSelectStock 
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [now, setNow] = useState(new Date());
+
+  const menuRef = useRef(null);
 
   // Live ticking clock updated every second
   useEffect(() => {
@@ -29,11 +34,24 @@ export default function Navbar({
     return () => clearInterval(timer);
   }, []);
 
+  // Click outside to close hamburger dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
+
   const tabs = [
-    { id: 'dashboard', label: 'Market Overview', icon: Activity },
-    { id: 'ai-analysis', label: 'Multi-Agent Screener', icon: Bot },
-    { id: 'paper-trading', label: 'Live Paper Trading', icon: Wallet, highlight: true },
-    { id: 'algo-academy', label: 'Algo Academy', icon: BookOpen },
+    { id: 'dashboard', label: 'Market Overview', desc: 'Indices, liquid bluechips & movers', icon: Activity },
+    { id: 'ai-analysis', label: 'Multi-Agent Screener', desc: 'Pre-market discovery & agent signals', icon: Bot },
+    { id: 'paper-trading', label: 'Live Paper Trading', desc: 'Virtual portfolio & risk guardrails', icon: Wallet },
+    { id: 'algo-academy', label: 'Algo Academy', desc: 'Quantitative strategies knowledge base', icon: BookOpen },
   ];
 
   const searchResults = searchQuery.trim() === '' ? [] : stocks.filter(s => {
@@ -42,30 +60,31 @@ export default function Navbar({
     return s.symbol.toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q);
   }).slice(0, 6);
 
-  // Determine Indian Stock Market Hours (NSE/BSE: 09:15 to 15:30 IST, Mon-Fri)
-  const day = now.getDay(); // 0 is Sun, 6 is Sat
+  // Determine Indian Stock Market Hours (NSE: 09:15 to 15:30 IST, Mon-Fri)
+  const day = now.getDay();
   const isWeekday = day >= 1 && day <= 5;
   const hours = now.getHours();
   const minutes = now.getMinutes();
   const timeInMinutes = hours * 60 + minutes;
 
-  const isPreMarket = isWeekday && timeInMinutes >= 540 && timeInMinutes < 555; // 09:00 - 09:15
-  const isLiveMarket = isWeekday && timeInMinutes >= 555 && timeInMinutes <= 930; // 09:15 - 15:30
-  
+  const isPreMarket = isWeekday && timeInMinutes >= 540 && timeInMinutes < 555;
+  const isLiveMarket = isWeekday && timeInMinutes >= 555 && timeInMinutes <= 930;
+
   let marketStatusText = 'Market Closed';
-  let marketColor = '#8b949e';
+  let marketColor = '#888888';
   if (isLiveMarket) {
     marketStatusText = '● NSE LIVE (09:15 - 15:30)';
-    marketColor = '#2ed573';
+    marketColor = 'var(--green, #2ed573)';
   } else if (isPreMarket) {
     marketStatusText = '● Pre-Market Session';
-    marketColor = '#ffa502';
+    marketColor = 'var(--amber, #ffa502)';
   } else {
     marketStatusText = isWeekday && timeInMinutes < 540 ? 'Opens 09:15 AM' : 'Market Closed';
   }
 
   const timeString = now.toLocaleTimeString('en-IN', { hour12: false });
-  const dateString = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+
+  const activeTabMeta = tabs.find(t => t.id === activeTab) || tabs[0];
 
   return (
     <header style={{
@@ -74,98 +93,65 @@ export default function Navbar({
       position: 'sticky',
       top: 0,
       zIndex: 100,
-      padding: '0 1.5rem'
+      padding: '0 1.25rem'
     }}>
-      <div style={{
+      <div className="navbar-container" style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        height: '64px',
+        height: '60px',
         maxWidth: '1600px',
         margin: '0 auto',
         gap: '1rem'
       }}>
-        {/* Brand */}
+        {/* Brand (TAIL with Official Infinity Logo) */}
         <div 
           onClick={() => setActiveTab('dashboard')}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', userSelect: 'none' }}
         >
-          <div style={{
-            background: 'linear-gradient(135deg, #00d4aa, #0099ff)',
-            padding: '7px 9px',
-            borderRadius: '9px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 0 16px rgba(0, 212, 170, 0.3)'
-          }}>
-            <TrendingUp size={20} color="#0f1117" strokeWidth={2.5} />
-          </div>
-          <div>
-            <div style={{
+          <img 
+            src="/tail-mark.png" 
+            alt="TAIL" 
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              border: '1px solid var(--border, #2a2d35)',
+              display: 'block',
+              objectFit: 'cover'
+            }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{
               fontWeight: 800,
               fontSize: '1.15rem',
-              letterSpacing: '-0.02em',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
+              letterSpacing: '0.04em',
+              color: '#ffffff'
             }}>
-              <span>Trade with AI and Learn</span>
-              <span style={{
-                background: isLiveMarket ? 'rgba(46, 213, 115, 0.15)' : 'rgba(0, 212, 170, 0.15)',
-                color: isLiveMarket ? 'var(--green, #2ed573)' : 'var(--accent, #00d4aa)',
-                fontSize: '0.62rem',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontWeight: 800
-              }}>
-                {isLiveMarket ? 'NSE LIVE' : 'NSE TERMINAL'}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #8b949e)' }}>
-              Autonomous Multi-Agent Quant & Paper Trading
-            </div>
+              TAIL
+            </span>
+            <span className="brand-subtext" style={{
+              color: 'var(--text-muted, #888888)',
+              fontSize: '0.82rem',
+              fontWeight: 500
+            }}>
+              Trade with AI and Learn
+            </span>
+            <span style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid var(--border, #2a2d35)',
+              color: 'var(--text-muted, #888888)',
+              fontSize: '0.65rem',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontWeight: 600
+            }}>
+              {activeTabMeta.label}
+            </span>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  padding: '7px 13px',
-                  borderRadius: '7px',
-                  border: isActive 
-                    ? '1px solid var(--accent, #00d4aa)' 
-                    : (tab.highlight ? '1px solid rgba(46, 213, 115, 0.3)' : '1px solid transparent'),
-                  background: isActive 
-                    ? 'rgba(0, 212, 170, 0.12)' 
-                    : (tab.highlight ? 'rgba(46, 213, 115, 0.08)' : 'transparent'),
-                  color: isActive 
-                    ? 'var(--accent, #00d4aa)' 
-                    : (tab.highlight ? 'var(--green, #2ed573)' : 'var(--text-muted, #8b949e)'),
-                  fontSize: '0.84rem',
-                  fontWeight: isActive || tab.highlight ? 700 : 500,
-                  transition: 'all 0.15s ease',
-                  cursor: 'pointer'
-                }}
-              >
-                <Icon size={15} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Live Clock, Search & Sync Actions */}
+        {/* Right Actions: Clock, Search, Sync, and 3-Line Dropdown Menu */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', position: 'relative' }}>
           
           {/* Live Ticking Clock & Market Status Badge */}
@@ -173,29 +159,28 @@ export default function Navbar({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            background: 'var(--bg-secondary, #22252d)',
+            background: 'var(--bg-card, #1a1d23)',
             border: '1px solid var(--border, #2a2d35)',
-            borderRadius: '8px',
-            padding: '5px 12px'
+            borderRadius: '6px',
+            padding: '4px 10px'
           }}>
-            <Clock size={15} color="var(--accent, #00d4aa)" />
+            <Clock size={13} color="var(--text-muted, #888888)" />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{
                 fontFamily: 'monospace',
-                fontSize: '0.82rem',
-                fontWeight: 800,
-                color: '#f0f2f5',
-                letterSpacing: '0.03em',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: 'var(--text-main, #d1d5db)',
                 lineHeight: 1.1
               }}>
-                {timeString} <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #8b949e)' }}>IST</span>
+                {timeString} <span style={{ fontSize: '0.65rem', color: 'var(--text-muted, #888888)' }}>IST</span>
               </div>
               <div style={{
-                fontSize: '0.65rem',
-                fontWeight: 700,
+                fontSize: '0.62rem',
+                fontWeight: 600,
                 color: marketColor,
                 lineHeight: 1.1,
-                marginTop: '2px'
+                marginTop: '1px'
               }}>
                 {marketStatusText}
               </div>
@@ -208,13 +193,13 @@ export default function Navbar({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: 'var(--bg-secondary, #22252d)',
+              background: 'var(--bg-card, #1a1d23)',
               border: '1px solid var(--border, #2a2d35)',
-              borderRadius: '7px',
-              padding: '5px 10px',
-              width: '160px'
+              borderRadius: '6px',
+              padding: '4px 8px',
+              width: '140px'
             }}>
-              <Search size={14} color="var(--text-muted, #8b949e)" />
+              <Search size={13} color="var(--text-muted, #888888)" />
               <input
                 type="text"
                 placeholder="Find stock..."
@@ -225,8 +210,8 @@ export default function Navbar({
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  color: 'var(--text-main, #f0f2f5)',
-                  fontSize: '0.8rem',
+                  color: 'var(--text-main, #d1d5db)',
+                  fontSize: '0.78rem',
                   width: '100%'
                 }}
               />
@@ -235,13 +220,13 @@ export default function Navbar({
             {searchOpen && searchResults.length > 0 && (
               <div style={{
                 position: 'absolute',
-                top: '105%',
+                top: '110%',
                 right: 0,
-                width: '260px',
+                width: '240px',
                 background: 'var(--bg-card, #1a1d23)',
                 border: '1px solid var(--border, #2a2d35)',
                 borderRadius: '8px',
-                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
                 zIndex: 200,
                 overflow: 'hidden'
               }}>
@@ -260,16 +245,16 @@ export default function Navbar({
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      fontSize: '0.82rem'
+                      fontSize: '0.8rem'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     <div>
-                      <div style={{ fontWeight: 700 }}>{s.symbol.replace('.NS', '')}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #8b949e)' }}>{s.name}</div>
+                      <div style={{ fontWeight: 600, color: '#fff' }}>{s.symbol.replace('.NS', '')}</div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>{s.name}</div>
                     </div>
-                    <div style={{ fontWeight: 600 }}>₹{s.price || '—'}</div>
+                    <div style={{ fontWeight: 600, color: '#aaa' }}>₹{s.price || '—'}</div>
                   </div>
                 ))}
               </div>
@@ -283,13 +268,13 @@ export default function Navbar({
             style={{
               background: 'var(--bg-card, #1a1d23)',
               border: '1px solid var(--border, #2a2d35)',
-              color: isRefreshing ? 'var(--accent, #00d4aa)' : 'var(--text-main, #f0f2f5)',
-              padding: '6px 12px',
-              borderRadius: '7px',
+              color: isRefreshing ? 'var(--accent, #00d4aa)' : 'var(--text-main, #d1d5db)',
+              padding: '6px 10px',
+              borderRadius: '6px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              fontSize: '0.8rem',
+              fontSize: '0.78rem',
               fontWeight: 600,
               cursor: isRefreshing ? 'wait' : 'pointer',
               transition: 'all 0.15s ease'
@@ -299,6 +284,110 @@ export default function Navbar({
             <RefreshCw size={13} className={isRefreshing ? 'spin' : ''} />
             <span>{isRefreshing ? 'Syncing...' : 'Sync'}</span>
           </button>
+
+          {/* 3-Line Dropdown Menu Beside Sync (Point 7) */}
+          <div ref={menuRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              style={{
+                background: menuOpen ? 'var(--accent, #00d4aa)' : 'var(--bg-card, #1a1d23)',
+                border: '1px solid var(--border, #2a2d35)',
+                color: menuOpen ? '#0f1117' : 'var(--text-main, #d1d5db)',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Navigation Menu"
+            >
+              {menuOpen ? <X size={16} /> : <Menu size={16} />}
+            </button>
+
+            {menuOpen && (
+              <div style={{
+                position: 'absolute',
+                top: '115%',
+                right: 0,
+                width: '260px',
+                background: 'var(--bg-card, #1a1d23)',
+                border: '1px solid var(--border, #2a2d35)',
+                borderRadius: '10px',
+                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6)',
+                zIndex: 250,
+                padding: '6px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <div style={{
+                  padding: '6px 10px',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--text-muted, #888888)',
+                  borderBottom: '1px solid rgba(42, 45, 53, 0.5)'
+                }}>
+                  Platform Sections
+                </div>
+
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id);
+                        setMenuOpen(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        background: isActive ? 'rgba(0, 212, 170, 0.12)' : 'transparent',
+                        border: isActive ? '1px solid rgba(0, 212, 170, 0.3)' : '1px solid transparent',
+                        transition: 'background 0.15s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Icon 
+                          size={16} 
+                          color={isActive ? 'var(--accent, #00d4aa)' : 'var(--text-muted, #888888)'} 
+                        />
+                        <div>
+                          <div style={{
+                            fontSize: '0.82rem',
+                            fontWeight: isActive ? 700 : 600,
+                            color: isActive ? 'var(--accent, #00d4aa)' : 'var(--text-main, #d1d5db)'
+                          }}>
+                            {tab.label}
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>
+                            {tab.desc}
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight size={14} color="var(--text-muted, #888888)" />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </header>

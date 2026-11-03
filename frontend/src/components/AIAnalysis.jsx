@@ -18,7 +18,9 @@ export default function AIAnalysis({
   selectedSymbol, 
   onSelectSymbol, 
   onNavigateToAlgo,
-  onSendToPaperTrading 
+  onSendToPaperTrading,
+  watchlist = [],
+  onToggleWatchlist
 }) {
   const [isScanning, setIsScanning] = useState(false);
   const [rankedList, setRankedList] = useState([]);
@@ -176,6 +178,8 @@ export default function AIAnalysis({
             ) : (
               rankedList.map((stk, idx) => {
                 const isSelected = selectedSymbol === stk.symbol;
+                const rawSym = stk.symbol?.replace('.NS', '');
+                const isWatchlisted = watchlist.includes(stk.symbol) || watchlist.includes(rawSym);
                 return (
                   <div
                     key={stk.symbol}
@@ -193,6 +197,26 @@ export default function AIAnalysis({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {onToggleWatchlist && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleWatchlist(stk.symbol);
+                          }}
+                          title={isWatchlisted ? 'Remove from Watchlist' : 'Add to Watchlist'}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: isWatchlisted ? '#fbbf24' : '#4b5563',
+                            fontSize: '1rem',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            lineHeight: 1
+                          }}
+                        >
+                          {isWatchlisted ? '★' : '☆'}
+                        </button>
+                      )}
                       <span style={{
                         width: '24px',
                         height: '24px',
@@ -257,6 +281,23 @@ export default function AIAnalysis({
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{detailData.name}</h2>
+                    {onToggleWatchlist && (
+                      <button
+                        onClick={() => onToggleWatchlist(detailData.symbol)}
+                        title="Toggle Watchlist"
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '1.3rem',
+                          color: (watchlist.includes(detailData.symbol) || watchlist.includes(detailData.symbol?.replace('.NS', ''))) ? '#fbbf24' : '#6b7280',
+                          padding: '0 4px',
+                          lineHeight: 1
+                        }}
+                      >
+                        {(watchlist.includes(detailData.symbol) || watchlist.includes(detailData.symbol?.replace('.NS', ''))) ? '★' : '☆'}
+                      </button>
+                    )}
                     <span style={{ background: 'var(--border)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>
                       {detailData.symbol}
                     </span>

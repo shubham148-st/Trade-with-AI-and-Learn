@@ -10,11 +10,14 @@ import {
   Zap, 
   BarChart2, 
   Sliders, 
+  SlidersHorizontal,
+  Check,
   HelpCircle,
   ExternalLink,
   ChevronRight,
   Layers,
-  Calendar
+  Calendar,
+  Star
 } from 'lucide-react';
 import { 
   createChart, 
@@ -33,19 +36,24 @@ export default function StockPage({
   symbol = 'RELIANCE.NS', 
   onBack, 
   onSendToPaperTrading,
-  onNavigateToAlgo 
+  onNavigateToAlgo,
+  isInWatchlist = false,
+  onToggleWatchlist
 }) {
   const chartContainerRef = useRef(null);
   const chartInstanceRef = useRef(null);
   const mainSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const cachedDataRef = useRef({ candles: [], lines: [], volumes: [] });
+  const terminalMenuRef = useRef(null);
 
   // Quote and Historical Chart state
   const [quote, setQuote] = useState(null);
   const [period, setPeriod] = useState('1d'); // Default view is 1D
   const [interval, setInterval] = useState('1m'); // 1m live feed tick interval
-  const [chartType, setChartType] = useState('line-dots'); // Default: Line & Dots
+  const [chartType, setChartType] = useState('line-dots'); // Default: Line
+  const [showVolume, setShowVolume] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
   const [chartLoading, setChartLoading] = useState(true);
   const [chartError, setChartError] = useState(null);
 
@@ -60,19 +68,36 @@ export default function StockPage({
 
   const periods = [
     { label: '1D', period: '1d', interval: '1m' },
-    { label: '5D', period: '5d', interval: '5m' },
+    { label: '1W', period: '5d', interval: '5m' },
     { label: '1M', period: '1mo', interval: '1d' },
+    { label: '3M', period: '3mo', interval: '1d' },
     { label: '6M', period: '6mo', interval: '1d' },
     { label: '1Y', period: '1y', interval: '1d' },
+    { label: '3Y', period: '3y', interval: '1wk' },
+    { label: '5Y', period: '5y', interval: '1wk' },
+    { label: 'All', period: 'max', interval: '1mo' },
   ];
 
   const famousGraphOptions = [
-    { id: 'line-dots', label: '📈 Line & Dots (Default)' },
+    { id: 'line-dots', label: '📈 Line Chart' },
     { id: 'candlestick', label: '🕯️ Japanese Candlestick' },
     { id: 'area', label: '🌊 Area / Mountain' },
     { id: 'bar', label: '📊 OHLC Bars' },
     { id: 'baseline', label: '⚖️ Baseline Delta' },
   ];
+
+  // Close Terminal popover on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (terminalMenuRef.current && !terminalMenuRef.current.contains(e.target)) {
+        setTerminalOpen(false);
+      }
+    };
+    if (terminalOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [terminalOpen]);
 
   // Fetch real-time quote
   useEffect(() => {
@@ -108,10 +133,9 @@ export default function StockPage({
       series = chart.addSeries(LineSeries, {
         color: '#00d4aa',
         lineWidth: 2,
-        pointMarkersVisible: true,
-        pointMarkersRadius: 4,
-        crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 6,
+        pointMarkersVisible: false, // Clean line without static dots
+        crosshairMarkerVisible: true, // Dot appears dynamically when hovering over graph
+        crosshairMarkerRadius: 5,
         crosshairMarkerBorderColor: '#ffffff',
         crosshairMarkerBackgroundColor: '#00d4aa',
       });
@@ -127,13 +151,12 @@ export default function StockPage({
     } else if (type === 'area') {
       series = chart.addSeries(AreaSeries, {
         lineColor: '#00d4aa',
-        topColor: 'rgba(0, 212, 170, 0.45)',
+        topColor: 'rgba(0, 212, 170, 0.3)',
         bottomColor: 'rgba(0, 212, 170, 0.02)',
         lineWidth: 2,
-        pointMarkersVisible: true,
-        pointMarkersRadius: 3,
+        pointMarkersVisible: false,
         crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 6,
+        crosshairMarkerRadius: 5,
         crosshairMarkerBorderColor: '#ffffff',
         crosshairMarkerBackgroundColor: '#00d4aa',
       });
@@ -148,15 +171,14 @@ export default function StockPage({
         baseValue: { type: 'price', price: baseVal },
         topLineColor: '#2ed573',
         bottomLineColor: '#ff4757',
-        topFillColor1: 'rgba(46, 213, 115, 0.35)',
-        topFillColor2: 'rgba(46, 213, 115, 0.05)',
-        bottomFillColor1: 'rgba(255, 71, 87, 0.05)',
-        bottomFillColor2: 'rgba(255, 71, 87, 0.35)',
+        topFillColor1: 'rgba(46, 213, 115, 0.25)',
+        topFillColor2: 'rgba(46, 213, 115, 0.02)',
+        bottomFillColor1: 'rgba(255, 71, 87, 0.02)',
+        bottomFillColor2: 'rgba(255, 71, 87, 0.25)',
         lineWidth: 2,
-        pointMarkersVisible: true,
-        pointMarkersRadius: 3,
+        pointMarkersVisible: false,
         crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 6,
+        crosshairMarkerRadius: 5,
       });
     }
 
@@ -222,6 +244,7 @@ export default function StockPage({
         priceFormat: { type: 'volume' },
         priceScaleId: '',
         scaleMargins: { top: 0.8, bottom: 0 },
+        visible: chartType === 'candlestick' && showVolume,
       });
 
       chartInstanceRef.current = chart;
@@ -242,12 +265,18 @@ export default function StockPage({
         }
 
         let hoveredPrice = null;
+        let openVal = null, highVal = null, lowVal = null, closeVal = null;
         const mainData = param.seriesData.get(mainSeriesRef.current);
         if (mainData) {
           if (typeof mainData.value === 'number') {
             hoveredPrice = mainData.value;
+            closeVal = mainData.value;
           } else if (typeof mainData.close === 'number') {
             hoveredPrice = mainData.close;
+            closeVal = mainData.close;
+            openVal = mainData.open;
+            highVal = mainData.high;
+            lowVal = mainData.low;
           }
         }
 
@@ -279,6 +308,10 @@ export default function StockPage({
 
         setHoveredPoint({
           price: hoveredPrice,
+          open: openVal ?? hoveredPrice,
+          high: highVal ?? hoveredPrice,
+          low: lowVal ?? hoveredPrice,
+          close: closeVal ?? hoveredPrice,
           change: diff,
           changePct: diffPct,
           volume: hoveredVolume,
@@ -396,6 +429,29 @@ export default function StockPage({
     }
   };
 
+  const handleToggleLineCandle = () => {
+    if (chartType === 'candlestick') {
+      handleChartTypeChange('line-dots');
+      setShowVolume(false);
+      if (volumeSeriesRef.current) {
+        volumeSeriesRef.current.applyOptions({ visible: false });
+      }
+    } else {
+      handleChartTypeChange('candlestick');
+      setShowVolume(true);
+      if (volumeSeriesRef.current) {
+        volumeSeriesRef.current.applyOptions({ visible: true });
+      }
+    }
+  };
+
+  const handleVolumeToggle = (visible) => {
+    setShowVolume(visible);
+    if (volumeSeriesRef.current) {
+      volumeSeriesRef.current.applyOptions({ visible });
+    }
+  };
+
   // Run AI Multi-Agent Analysis on demand
   const handleTriggerAI = async () => {
     setAiAnalysisRequested(true);
@@ -427,6 +483,21 @@ export default function StockPage({
   const displayChangePct = hoveredPoint ? hoveredPoint.changePct : liveChangePct;
   const isUp = displayChange >= 0;
 
+  const latestCandle = cachedDataRef.current.candles.slice(-1)[0] || {
+    open: baseLivePrice,
+    high: baseLivePrice,
+    low: baseLivePrice,
+    close: baseLivePrice,
+    volume: quote?.volume || 0
+  };
+  const activeOhlc = hoveredPoint ? {
+    open: hoveredPoint.open,
+    high: hoveredPoint.high,
+    low: hoveredPoint.low,
+    close: hoveredPoint.close,
+    volume: hoveredPoint.volume
+  } : latestCandle;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingBottom: '2rem' }}>
       {/* Top Navigation Bar */}
@@ -450,7 +521,28 @@ export default function StockPage({
           <ArrowLeft size={16} /> Back to Market Overview
         </button>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={onToggleWatchlist}
+            style={{
+              background: isInWatchlist ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid ' + (isInWatchlist ? '#f59e0b' : 'var(--border, #2a2d35)'),
+              color: isInWatchlist ? '#f59e0b' : 'var(--text-main, #d1d5db)',
+              padding: '8px 14px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Star size={15} fill={isInWatchlist ? '#f59e0b' : 'none'} />
+            {isInWatchlist ? 'Watchlisted' : 'Watchlist'}
+          </button>
+
           <button
             onClick={() => onSendToPaperTrading && onSendToPaperTrading({
               symbol,
@@ -475,36 +567,39 @@ export default function StockPage({
       </div>
 
       {/* Stock Hero Card (Groww-Style dynamic live / hover display) */}
-      <div style={{
-        background: 'linear-gradient(135deg, var(--bg-card, #1a1d23), #161a22)',
-        border: '1px solid var(--border, #2a2d35)',
-        borderRadius: '14px',
-        padding: '1.5rem',
-        display: 'flex',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '1.5rem'
-      }}>
+      <div 
+        className="stock-hero-card"
+        style={{
+          background: 'var(--bg-card, #1a1d23)',
+          border: '1px solid var(--border, #2a2d35)',
+          borderRadius: '12px',
+          padding: '1.25rem',
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '1.25rem'
+        }}
+      >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{
-              background: 'rgba(0, 212, 170, 0.15)',
+              background: 'rgba(0, 212, 170, 0.12)',
               color: 'var(--accent, #00d4aa)',
-              padding: '4px 10px',
+              padding: '3px 8px',
               borderRadius: '4px',
-              fontSize: '0.8rem',
+              fontSize: '0.78rem',
               fontWeight: 700
             }}>
               NSE: {cleanName}
             </span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #8b949e)' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #888888)' }}>
               {quote?.name || cleanName}
             </span>
             {hoveredPoint && (
               <span style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                color: 'var(--accent, #00d4aa)',
+                background: 'rgba(255, 255, 255, 0.05)',
+                color: 'var(--text-main, #d1d5db)',
                 padding: '2px 8px',
                 borderRadius: '4px',
                 fontSize: '0.72rem',
@@ -517,8 +612,8 @@ export default function StockPage({
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginTop: '8px' }}>
-            <span style={{ fontSize: '2.2rem', fontWeight: 900 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginTop: '6px' }}>
+            <span style={{ fontSize: '2rem', fontWeight: 800 }}>
               ₹{displayPrice ? Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : 'Loading...'}
             </span>
             <span style={{
@@ -527,155 +622,107 @@ export default function StockPage({
               gap: '4px',
               color: isUp ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)',
               fontWeight: 700,
-              fontSize: '1.1rem'
+              fontSize: '1rem'
             }}>
-              {isUp ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+              {isUp ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
               {isUp ? '+' : ''}{displayChange.toFixed(2)} ({isUp ? '+' : ''}{displayChangePct.toFixed(2)}%)
             </span>
           </div>
         </div>
 
         {/* Key Stats Chips */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-          gap: '1rem',
-          flex: '1',
-          maxWidth: '650px'
-        }}>
-          <div style={{ background: 'var(--bg-secondary, #22252d)', padding: '10px 14px', borderRadius: '8px' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #8b949e)' }}>Day Range</div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 700, marginTop: '2px' }}>
+        <div 
+          className="stock-stats-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+            gap: '0.75rem',
+            flex: '1',
+            maxWidth: '600px'
+          }}
+        >
+          <div style={{ background: 'var(--bg-secondary, #14171d)', border: '1px solid var(--border, #2a2d35)', padding: '8px 12px', borderRadius: '6px' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #888888)' }}>Day Range</div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: '2px' }}>
               ₹{quote?.dayLow ? quote.dayLow.toFixed(1) : '—'} - {quote?.dayHigh ? quote.dayHigh.toFixed(1) : '—'}
             </div>
           </div>
-          <div style={{ background: 'var(--bg-secondary, #22252d)', padding: '10px 14px', borderRadius: '8px' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #8b949e)' }}>52W Range</div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 700, marginTop: '2px' }}>
+          <div style={{ background: 'var(--bg-secondary, #14171d)', border: '1px solid var(--border, #2a2d35)', padding: '8px 12px', borderRadius: '6px' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #888888)' }}>52W Range</div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: '2px' }}>
               ₹{quote?.fiftyTwoWeekLow ? quote.fiftyTwoWeekLow.toFixed(1) : '—'} - {quote?.fiftyTwoWeekHigh ? quote.fiftyTwoWeekHigh.toFixed(1) : '—'}
             </div>
           </div>
-          <div style={{ background: 'var(--bg-secondary, #22252d)', padding: '10px 14px', borderRadius: '8px' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #8b949e)' }}>Volume</div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 700, marginTop: '2px' }}>
+          <div style={{ background: 'var(--bg-secondary, #14171d)', border: '1px solid var(--border, #2a2d35)', padding: '8px 12px', borderRadius: '6px' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #888888)' }}>Volume</div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: '2px' }}>
               {quote?.volume ? Number(quote.volume).toLocaleString('en-IN') : '—'}
             </div>
           </div>
-          <div style={{ background: 'var(--bg-secondary, #22252d)', padding: '10px 14px', borderRadius: '8px' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #8b949e)' }}>P/E Ratio</div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 700, marginTop: '2px' }}>
+          <div style={{ background: 'var(--bg-secondary, #14171d)', border: '1px solid var(--border, #2a2d35)', padding: '8px 12px', borderRadius: '6px' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #888888)' }}>P/E Ratio</div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: '2px' }}>
               {quote?.pe ? quote.pe.toFixed(2) : '—'}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Chart Section */}
+      {/* Main Chart Section (Groww Style Layout: Images 2 & 3) */}
       <div style={{
         background: 'var(--bg-card, #1a1d23)',
         border: '1px solid var(--border, #2a2d35)',
-        borderRadius: '14px',
+        borderRadius: '12px',
         overflow: 'hidden',
-        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.25)',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
         position: 'relative'
       }}>
-        {/* Chart Toolbar with Timeframes AND Famous Graph Dropdown */}
-        <div style={{
-          padding: '0.85rem 1.25rem',
-          borderBottom: '1px solid var(--border, #2a2d35)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          background: 'var(--bg-bar, #12141a)',
-          flexWrap: 'wrap',
-          gap: '0.75rem'
-        }}>
-          {/* Timeframe Buttons */}
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {periods.map(p => (
-              <button
-                key={p.label}
-                onClick={() => handlePeriodChange(p.period, p.interval)}
-                style={{
-                  background: period === p.period ? 'var(--accent, #00d4aa)' : 'rgba(255,255,255,0.05)',
-                  color: period === p.period ? '#0f1117' : 'var(--text-main, #f0f2f5)',
-                  fontWeight: 700,
-                  fontSize: '0.78rem',
-                  padding: '5px 12px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s'
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+        {/* Top Candlestick OHLC + Volume Bar (Image 2) */}
+        {chartType === 'candlestick' && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: '16px',
+            padding: '8px 16px',
+            background: 'var(--bg-bar, #12141a)',
+            borderBottom: '1px solid var(--border, #2a2d35)',
+            fontSize: '0.78rem',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted, #888888)' }}>
+              <span style={{ fontWeight: 600 }}>Price</span>
+              <span>O <strong style={{ color: '#d1d5db' }}>₹{Number(activeOhlc.open || 0).toFixed(2)}</strong></span>
+              <span>H <strong style={{ color: 'var(--green, #2ed573)' }}>₹{Number(activeOhlc.high || 0).toFixed(2)}</strong></span>
+              <span>L <strong style={{ color: 'var(--red, #ff4757)' }}>₹{Number(activeOhlc.low || 0).toFixed(2)}</strong></span>
+              <span>C <strong style={{ color: '#d1d5db' }}>₹{Number(activeOhlc.close || 0).toFixed(2)}</strong></span>
+            </div>
 
-          {/* Famous Graphs Dropdown Selector (Default: Line and Dot) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
+            <label style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: 'var(--bg-secondary, #22252d)',
-              border: '1px solid var(--border, #2a2d35)',
-              borderRadius: '7px',
-              padding: '4px 8px'
+              cursor: 'pointer',
+              userSelect: 'none',
+              color: showVolume ? 'var(--accent, #00d4aa)' : 'var(--text-muted, #888888)',
+              fontWeight: 600
             }}>
-              <Layers size={14} color="var(--accent, #00d4aa)" />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)', fontWeight: 600 }}>Graph:</span>
-              <select
-                value={chartType}
-                onChange={(e) => handleChartTypeChange(e.target.value)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--accent, #00d4aa)',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  outline: 'none'
-                }}
-              >
-                {famousGraphOptions.map(opt => (
-                  <option 
-                    key={opt.id} 
-                    value={opt.id} 
-                    style={{ background: '#1a1d23', color: '#f0f2f5' }}
-                  >
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              onClick={() => fetchCandles(period, interval, chartType)}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--border, #2a2d35)',
-                color: 'var(--text-muted, #8b949e)',
-                borderRadius: '6px',
-                padding: '4px 10px',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              <RefreshCw size={13} className={chartLoading ? 'spin' : ''} /> Refresh
-            </button>
+              <input
+                type="checkbox"
+                checked={showVolume}
+                onChange={(e) => handleVolumeToggle(e.target.checked)}
+                style={{ accentColor: '#00d4aa', cursor: 'pointer' }}
+              />
+              <span>Volume <strong style={{ color: '#d1d5db' }}>{Number(activeOhlc.volume || 0).toLocaleString('en-IN')}</strong></span>
+            </label>
           </div>
-        </div>
+        )}
 
         {/* Chart View with Groww Floating Info Pill */}
         <div style={{ position: 'relative', width: '100%', height: '440px', background: '#12141a' }}>
           
-          {/* Groww Floating Hover Card */}
-          {hoveredPoint && (
+          {/* Floating hover card for Line mode */}
+          {chartType !== 'candlestick' && hoveredPoint && (
             <div style={{
               position: 'absolute',
               top: '12px',
@@ -693,7 +740,7 @@ export default function StockPage({
               gap: '14px'
             }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #8b949e)' }}>{hoveredPoint.dateStr}</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>{hoveredPoint.dateStr}</span>
                 <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#f0f2f5' }}>
                   ₹{hoveredPoint.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
@@ -706,8 +753,8 @@ export default function StockPage({
                 }}>
                   {hoveredPoint.change >= 0 ? '▲ +' : '▼ '}{hoveredPoint.change.toFixed(2)} ({Math.abs(hoveredPoint.changePct).toFixed(2)}%)
                 </span>
-                {hoveredPoint.volume > 0 && (
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #8b949e)' }}>
+                {showVolume && hoveredPoint.volume > 0 && (
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>
                     Vol: {Number(hoveredPoint.volume).toLocaleString('en-IN')}
                   </span>
                 )}
@@ -728,7 +775,7 @@ export default function StockPage({
               gap: '8px'
             }}>
               <RefreshCw size={24} className="spin" color="var(--accent, #00d4aa)" />
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #8b949e)' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #888888)' }}>
                 Fetching historical price stream...
               </span>
             </div>
@@ -751,59 +798,222 @@ export default function StockPage({
 
           <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
         </div>
+
+        {/* Bottom Toolbar: Timeframe Pills, Line/Sticks Toggle & Terminal Menu (Images 2 & 3) */}
+        <div 
+          className="chart-toolbar"
+          style={{
+            padding: '0.65rem 1rem',
+            borderTop: '1px solid var(--border, #2a2d35)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'var(--bg-bar, #12141a)',
+            flexWrap: 'wrap',
+            gap: '0.6rem'
+          }}
+        >
+          {/* Timeframe Buttons + Line/Candle Switch Button */}
+          <div className="period-selector" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {periods.map(p => (
+              <button
+                key={p.label}
+                onClick={() => handlePeriodChange(p.period, p.interval)}
+                style={{
+                  background: period === p.period ? 'var(--accent, #00d4aa)' : 'rgba(255,255,255,0.04)',
+                  color: period === p.period ? '#0f1117' : 'var(--text-main, #d1d5db)',
+                  fontWeight: 600,
+                  fontSize: '0.74rem',
+                  padding: '4px 10px',
+                  borderRadius: '16px',
+                  border: '1px solid ' + (period === p.period ? 'var(--accent, #00d4aa)' : 'rgba(255,255,255,0.06)'),
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+
+            {/* Quick-switch button: Line <-> Sticks (Image 2 & 3) */}
+            <button
+              onClick={handleToggleLineCandle}
+              title={chartType === 'candlestick' ? 'Switch to Line Chart' : 'Switch to Candlesticks'}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border, #2a2d35)',
+                borderRadius: '16px',
+                padding: '4px 10px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+                marginLeft: '4px'
+              }}
+            >
+              {chartType === 'candlestick' ? (
+                // Green line curve icon (Image 2)
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                  <path d="M1 11L6 6L10 9L17 2" stroke="#2ed573" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              ) : (
+                // Candlestick sticks icon with green/red bars and wicks (Image 3)
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                  <line x1="4" y1="1" x2="4" y2="13" stroke="#2ed573" strokeWidth="1.5" strokeLinecap="round"/>
+                  <rect x="2.5" y="3" width="3" height="6" fill="#2ed573" rx="0.5"/>
+                  <line x1="9" y1="2" x2="9" y2="12" stroke="#ff4757" strokeWidth="1.5" strokeLinecap="round"/>
+                  <rect x="7.5" y="5" width="3" height="5" fill="#ff4757" rx="0.5"/>
+                  <line x1="14" y1="1" x2="14" y2="13" stroke="#2ed573" strokeWidth="1.5" strokeLinecap="round"/>
+                  <rect x="12.5" y="4" width="3" height="6" fill="#2ed573" rx="0.5"/>
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Right: Terminal Menu Button with all other graphs */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ position: 'relative' }} ref={terminalMenuRef}>
+              <button
+                onClick={() => setTerminalOpen(!terminalOpen)}
+                style={{
+                  background: terminalOpen ? 'var(--accent, #00d4aa)' : 'rgba(255, 255, 255, 0.05)',
+                  color: terminalOpen ? '#0f1117' : 'var(--text-main, #d1d5db)',
+                  border: '1px solid var(--border, #2a2d35)',
+                  borderRadius: '16px',
+                  padding: '4px 12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>Terminal</span>
+                <SlidersHorizontal size={13} />
+              </button>
+
+              {terminalOpen && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  right: 0,
+                  marginBottom: '8px',
+                  background: '#1a1d23',
+                  border: '1px solid var(--border, #2a2d35)',
+                  borderRadius: '10px',
+                  boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6)',
+                  padding: '6px',
+                  minWidth: '210px',
+                  zIndex: 50
+                }}>
+                  <div style={{ fontSize: '0.68rem', color: '#888', padding: '6px 10px', fontWeight: 600, textTransform: 'uppercase' }}>
+                    Chart Styles
+                  </div>
+                  {famousGraphOptions.map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        handleChartTypeChange(opt.id);
+                        if (opt.id === 'candlestick') {
+                          setShowVolume(true);
+                          if (volumeSeriesRef.current) volumeSeriesRef.current.applyOptions({ visible: true });
+                        }
+                        setTerminalOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '7px 10px',
+                        borderRadius: '6px',
+                        background: chartType === opt.id ? 'rgba(0, 212, 170, 0.15)' : 'transparent',
+                        color: chartType === opt.id ? 'var(--accent, #00d4aa)' : '#d1d5db',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.78rem',
+                        fontWeight: chartType === opt.id ? 700 : 500,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <span>{opt.label}</span>
+                      {chartType === opt.id && <Check size={14} color="#00d4aa" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => fetchCandles(period, interval, chartType)}
+              title="Refresh Data Stream"
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--border, #2a2d35)',
+                color: 'var(--text-muted, #888888)',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                fontSize: '0.72rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <RefreshCw size={12} className={chartLoading ? 'spin' : ''} />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Dedicated AI Multi-Agent Section (Opt-in trigger) */}
       <div style={{
-        background: 'linear-gradient(145deg, var(--bg-card, #1a1d23), #181d28)',
+        background: 'var(--bg-card, #1a1d23)',
         border: '1px solid var(--border, #2a2d35)',
-        borderRadius: '14px',
-        padding: '1.5rem',
+        borderRadius: '12px',
+        padding: '1.25rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.25rem'
+        gap: '1rem'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--accent, #00d4aa)', fontSize: '0.8rem', fontWeight: 700 }}>
-              <Bot size={16} /> AUTONOMOUS MULTI-AGENT QUANT ENGINE
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--accent, #00d4aa)', fontSize: '0.85rem', fontWeight: 700 }}>
+              <Bot size={16} /> AI Multi-Agent Analysis
             </div>
-            <h3 style={{ margin: '4px 0 0 0', fontSize: '1.2rem', fontWeight: 800 }}>
-              Deep AI Multi-Agent Analysis
-            </h3>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted, #8b949e)' }}>
-              Click the button below to spin up the 3 autonomous agents (News NLP Sentiment, Historical Volume Breakouts, and Technical Algos) for {cleanName}.
-            </p>
           </div>
 
           <button
             onClick={handleTriggerAI}
             disabled={aiLoading}
             style={{
-              background: 'linear-gradient(135deg, var(--accent, #00d4aa), #00a884)',
-              color: '#0f1117',
-              border: 'none',
-              padding: '12px 24px',
-              borderRadius: '8px',
-              fontWeight: 800,
-              fontSize: '0.9rem',
+              background: 'rgba(0, 212, 170, 0.12)',
+              border: '1px solid var(--accent, #00d4aa)',
+              color: 'var(--accent, #00d4aa)',
+              padding: '8px 18px',
+              borderRadius: '6px',
+              fontWeight: 700,
+              fontSize: '0.82rem',
               cursor: aiLoading ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 15px rgba(0, 212, 170, 0.3)',
-              opacity: aiLoading ? 0.7 : 1
+              gap: '6px',
+              opacity: aiLoading ? 0.7 : 1,
+              transition: 'all 0.15s'
             }}
           >
             {aiLoading ? (
               <>
-                <RefreshCw size={16} className="spin" />
+                <RefreshCw size={14} className="spin" />
                 Analyzing Agents Running...
               </>
             ) : (
               <>
-                <Sparkles size={16} />
-                {aiData ? 'Re-run AI Multi-Agent Analysis' : 'Run AI Multi-Agent Analysis'}
+                <Sparkles size={14} />
+                {aiData ? 'Re-run Multi-Agent Scan' : 'Run Multi-Agent Scan'}
               </>
             )}
           </button>

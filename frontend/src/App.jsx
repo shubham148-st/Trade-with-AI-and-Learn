@@ -6,6 +6,8 @@ import StockPage from './components/StockPage';
 import AIAnalysis from './components/AIAnalysis';
 import PaperTrading from './components/PaperTrading';
 import AlgoAcademy from './components/AlgoAcademy';
+import Footer from './components/Footer';
+import { getWatchlistFromCookies, saveWatchlistToCookies } from './utils/cookies';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -14,35 +16,50 @@ export default function App() {
   const [highlightedAlgoId, setHighlightedAlgoId] = useState(null);
   const [prefilledOrder, setPrefilledOrder] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [watchlist, setWatchlist] = useState(() => getWatchlistFromCookies());
 
-  // Helper to extract stock symbol from either /COMPANY or #/COMPANY
-  const resolveStockFromUrl = () => {
-    // 1. Check pathname (e.g. /RELIANCE or /RELIANCE.NS)
-    const rawPath = window.location.pathname.replace(/^\/+/, '').trim();
-    if (rawPath && !rawPath.startsWith('api') && !rawPath.includes('.')) {
-      const clean = rawPath.toUpperCase();
-      return clean.endsWith('.NS') ? clean : `${clean}.NS`;
+  // Helper to resolve route and symbol from URL (Convention: /stocks/SYMBOL and /AI/SYMBOL)
+  const resolveRouteFromUrl = () => {
+    const path = window.location.pathname.replace(/^\/+/, '').trim();
+    const hash = window.location.hash.replace(/^#\/?/, '').trim();
+    const currentPath = path || hash;
+
+    if (!currentPath) {
+      return { tab: 'dashboard', symbol: null };
     }
-    // 2. Check hash (e.g. #/RELIANCE or #RELIANCE)
-    const rawHash = window.location.hash.replace(/^#\/?/, '').trim();
-    if (rawHash) {
-      const clean = rawHash.toUpperCase();
-      return clean.endsWith('.NS') ? clean : `${clean}.NS`;
+
+    if (currentPath.toLowerCase().startsWith('stocks/')) {
+      const sym = currentPath.slice(7).trim().toUpperCase();
+      return { tab: 'stock-detail', symbol: sym.endsWith('.NS') ? sym : `${sym}.NS` };
     }
-    return null;
+    if (currentPath.toUpperCase().startsWith('AI/') || currentPath.toLowerCase().startsWith('ai/')) {
+      const sym = currentPath.slice(3).trim().toUpperCase();
+      return { tab: 'ai-analysis', symbol: sym ? (sym.endsWith('.NS') ? sym : `${sym}.NS`) : 'RELIANCE.NS' };
+    }
+    if (currentPath.toLowerCase() === 'ai') {
+      return { tab: 'ai-analysis', symbol: 'RELIANCE.NS' };
+    }
+    if (currentPath.toLowerCase() === 'paper-trading') {
+      return { tab: 'paper-trading', symbol: null };
+    }
+    if (currentPath.toLowerCase() === 'algo-academy') {
+      return { tab: 'algo-academy', symbol: null };
+    }
+    // Fallback for legacy direct /SYMBOL URLs
+    const clean = currentPath.toUpperCase();
+    if (!clean.startsWith('API') && !clean.includes('.')) {
+      return { tab: 'stock-detail', symbol: clean.endsWith('.NS') ? clean : `${clean}.NS` };
+    }
+    return { tab: 'dashboard', symbol: null };
   };
 
   // Sync state with URL pathname & hash on initial load and navigation
   useEffect(() => {
     const handleLocationChange = () => {
-      const sym = resolveStockFromUrl();
-      if (sym) {
-        setSelectedStockSymbol(sym);
-        setActiveTab('stock-detail');
-      } else {
-        if (activeTab === 'stock-detail') {
-          setActiveTab('dashboard');
-        }
+      const route = resolveRouteFromUrl();
+      setActiveTab(route.tab);
+      if (route.symbol) {
+        setSelectedStockSymbol(route.symbol);
       }
     };
 
@@ -84,39 +101,74 @@ export default function App() {
     }
   };
 
-  // Handler: Select a stock from Overview / Ticker / Search -> Leads to Stock Page
+  // Handler: Select a stock from Overview / Ticker / Search -> Leads to /stocks/SYMBOL
   const handleSelectStock = (symbol) => {
     const formatted = symbol.includes('.NS') ? symbol : `${symbol}.NS`;
     const clean = formatted.replace('.NS', '');
     setSelectedStockSymbol(formatted);
     setActiveTab('stock-detail');
     try {
-      window.history.pushState({ symbol: formatted }, '', `/${clean}`);
+      window.history.pushState({ symbol: formatted }, '', `/stocks/${clean}`);
     } catch {
-      window.location.hash = `#/${clean}`;
+      window.location.hash = `#/stocks/${clean}`;
+    }
+  };
+
+  // Handler: Select a stock for AI Screener -> Leads to /AI/SYMBOL
+  const handleSelectStockForAI = (symbol) => {
+    const formatted = symbol.includes('.NS') ? symbol : `${symbol}.NS`;
+    const clean = formatted.replace('.NS', '');
+    setSelectedStockSymbol(formatted);
+    setActiveTab('ai-analysis');
+    try {
+      window.history.pushState({ symbol: formatted }, '', `/AI/${clean}`);
+    } catch {
+      window.location.hash = `#/AI/${clean}`;
+    }
+  };
+
+  // Handler: General Tab Navigation with clean URLs
+  const handleNavigateTab = (tab, symbol = selectedStockSymbol) => {
+    setActiveTab(tab);
+    const clean = (symbol || 'RELIANCE.NS').replace('.NS', '');
+    if (tab === 'dashboard') {
+      try { window.history.pushState({}, '', '/'); } catch { window.location.hash = ''; }
+    } else if (tab === 'stock-detail') {
+      try { window.history.pushState({}, '', `/stocks/${clean}`); } catch { window.location.hash = `#/stocks/${clean}`; }
+    } else if (tab === 'ai-analysis') {
+      try { window.history.pushState({}, '', `/AI/${clean}`); } catch { window.location.hash = `#/AI/${clean}`; }
+    } else {
+      try { window.history.pushState({}, '', `/${tab}`); } catch { window.location.hash = `#/${tab}`; }
     }
   };
 
   // Handler: Return back from Stock Page to Overview
   const handleBackToOverview = () => {
-    setActiveTab('dashboard');
-    try {
-      window.history.pushState({}, '', '/');
-    } catch {
-      window.location.hash = '';
-    }
+    handleNavigateTab('dashboard');
   };
 
   // Handler: Click an observed pattern/algo and redirect to Algo Academy explanation
   const handleNavigateToAlgo = (algoId) => {
     setHighlightedAlgoId(algoId);
-    setActiveTab('algo-academy');
+    handleNavigateTab('algo-academy');
   };
 
   // Handler: Send signal to Paper Trading
   const handleSendToPaperTrading = (order) => {
     setPrefilledOrder(order);
-    setActiveTab('paper-trading');
+    handleNavigateTab('paper-trading');
+  };
+
+  // Handler: Toggle Watchlist item persisted in cookies
+  const handleToggleWatchlist = (symbol) => {
+    const formatted = symbol.includes('.NS') ? symbol : `${symbol}.NS`;
+    setWatchlist(prev => {
+      const next = prev.includes(formatted)
+        ? prev.filter(s => s !== formatted)
+        : [...prev, formatted];
+      saveWatchlistToCookies(next);
+      return next;
+    });
   };
 
   return (
@@ -124,12 +176,7 @@ export default function App() {
       {/* Primary Navigation */}
       <Navbar 
         activeTab={activeTab === 'stock-detail' ? 'dashboard' : activeTab} 
-        setActiveTab={(tab) => {
-          setActiveTab(tab);
-          if (tab !== 'stock-detail') {
-            try { window.history.pushState({}, '', '/'); } catch { window.location.hash = ''; }
-          }
-        }} 
+        setActiveTab={handleNavigateTab} 
         onRefresh={fetchStockBatch}
         isRefreshing={isRefreshing}
         stocks={stocks}
@@ -151,7 +198,10 @@ export default function App() {
         {activeTab === 'dashboard' && (
           <MarketOverview 
             stocks={stocks} 
-            onSelectStock={handleSelectStock} 
+            onSelectStock={handleSelectStock}
+            onNavigateTab={handleNavigateTab}
+            watchlist={watchlist}
+            onToggleWatchlist={handleToggleWatchlist}
           />
         )}
 
@@ -161,15 +211,19 @@ export default function App() {
             onBack={handleBackToOverview}
             onSendToPaperTrading={handleSendToPaperTrading}
             onNavigateToAlgo={handleNavigateToAlgo}
+            isInWatchlist={watchlist.includes(selectedStockSymbol)}
+            onToggleWatchlist={() => handleToggleWatchlist(selectedStockSymbol)}
           />
         )}
 
         {activeTab === 'ai-analysis' && (
           <AIAnalysis 
             selectedSymbol={selectedStockSymbol || 'RELIANCE.NS'}
-            onSelectSymbol={setSelectedStockSymbol}
+            onSelectSymbol={handleSelectStockForAI}
             onNavigateToAlgo={handleNavigateToAlgo}
             onSendToPaperTrading={handleSendToPaperTrading}
+            watchlist={watchlist}
+            onToggleWatchlist={handleToggleWatchlist}
           />
         )}
 
@@ -184,10 +238,13 @@ export default function App() {
         {activeTab === 'algo-academy' && (
           <AlgoAcademy 
             highlightedAlgoId={highlightedAlgoId}
-            onSelectAlgoForTrading={() => setActiveTab('ai-analysis')}
+            onSelectAlgoForTrading={() => handleNavigateTab('ai-analysis')}
           />
         )}
       </main>
+
+      {/* Slide & Fade Footer */}
+      <Footer onNavigateTab={handleNavigateTab} />
     </div>
   );
 }

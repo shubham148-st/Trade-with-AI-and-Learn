@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, Search, ArrowUpRight, BarChart2, LineChart } from 'lucide-react';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Search, 
+  ArrowUpDown, 
+  ArrowUp, 
+  ArrowDown, 
+  LineChart,
+  Star
+} from 'lucide-react';
 import NiftyModal from './NiftyModal';
 
 const SECTOR_MAP = {
@@ -9,10 +18,78 @@ const SECTOR_MAP = {
   AUTO: ['MARUTI.NS', 'M&M.NS', 'BAJAJ-AUTO.NS'],
 };
 
-export default function MarketOverview({ stocks, onSelectStock }) {
+// Multi-point miniature intraday sparkline with dashed baseline matching Groww Image 4
+function MiniTrendSparkline({ symbol = '', changePct = 0 }) {
+  const isUp = (changePct || 0) >= 0;
+  const color = isUp ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)';
+  
+  let seed = 0;
+  for (let i = 0; i < symbol.length; i++) {
+    seed = (seed * 31 + symbol.charCodeAt(i)) % 10000;
+  }
+  
+  const width = 100;
+  const height = 28;
+  const baselineY = 20; // Dashed baseline
+  const startY = baselineY - (isUp ? 2 : -2);
+  const endY = isUp 
+    ? Math.max(4, baselineY - Math.min(16, Math.max(6, Math.abs(changePct) * 3.5)))
+    : Math.min(height - 4, baselineY + Math.min(7, Math.max(4, Math.abs(changePct) * 2.5)));
+  
+  const numPoints = 14;
+  const points = [];
+  for (let i = 0; i < numPoints; i++) {
+    const t = i / (numPoints - 1);
+    const x = Math.round(t * width);
+    let y = startY + (endY - startY) * t;
+    if (i > 0 && i < numPoints - 1) {
+      const wiggle = Math.sin((i + seed % 5) * 1.2) * 2.2 + Math.cos(i * 1.5 + seed % 3) * 1.2;
+      y = Math.max(3, Math.min(height - 3, y + wiggle));
+    }
+    points.push(`${x},${y.toFixed(1)}`);
+  }
+
+  return (
+    <div style={{ width: '100px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width="100" height="28" viewBox="0 0 100 28" fill="none" style={{ overflow: 'visible' }}>
+        {/* Gray dashed baseline as in Groww screenshot */}
+        <line
+          x1="0"
+          y1={baselineY}
+          x2="100"
+          y2={baselineY}
+          stroke="rgba(255, 255, 255, 0.16)"
+          strokeDasharray="3 3"
+          strokeWidth="1"
+        />
+        {/* Intraday natural curve */}
+        <polyline
+          points={points.join(' ')}
+          fill="none"
+          stroke={color}
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
+export default function MarketOverview({ 
+  stocks = [], 
+  onSelectStock, 
+  onNavigateTab,
+  watchlist = [],
+  onToggleWatchlist
+}) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('ALL');
   const [modalIndex, setModalIndex] = useState(null); // { symbol, title }
+
+  // Sorting state
+  const [sortField, setSortField] = useState('symbol');
+  const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
 
   const nifty = stocks.find(s => s.symbol === '^NSEI');
   const bankNifty = stocks.find(s => s.symbol === '^NSEBANK');
@@ -25,8 +102,9 @@ export default function MarketOverview({ stocks, onSelectStock }) {
                         s.symbol.toLowerCase().includes(searchTerm.toLowerCase());
     if (!matchSearch) return false;
 
-    // Category / Sector filter
+    // Category / Sector / Watchlist filter
     if (activeFilter === 'ALL') return true;
+    if (activeFilter === 'WATCHLIST') return watchlist.includes(s.symbol);
     if (activeFilter === 'GAINERS') return (s.changePct ?? 0) > 0;
     if (activeFilter === 'LOSERS') return (s.changePct ?? 0) < 0;
     if (SECTOR_MAP[activeFilter]) {
@@ -34,6 +112,52 @@ export default function MarketOverview({ stocks, onSelectStock }) {
     }
     return true;
   });
+
+  // Sort filtered stocks
+  const sortedStocks = [...filteredStocks].sort((a, b) => {
+    let aVal, bVal;
+    if (sortField === 'symbol') {
+      aVal = a.symbol || '';
+      bVal = b.symbol || '';
+      return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    }
+    if (sortField === 'name') {
+      aVal = a.name || '';
+      bVal = b.name || '';
+      return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    }
+    if (sortField === 'price') {
+      aVal = Number(a.price || 0);
+      bVal = Number(b.price || 0);
+    } else if (sortField === 'change') {
+      aVal = Number(a.change || 0);
+      bVal = Number(b.change || 0);
+    } else if (sortField === 'changePct') {
+      aVal = Number(a.changePct || 0);
+      bVal = Number(b.changePct || 0);
+    } else {
+      return 0;
+    }
+    return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+  });
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const renderSortIndicator = (field) => {
+    if (sortField !== field) {
+      return <ArrowUpDown size={11} color="var(--text-muted, #888888)" style={{ opacity: 0.4 }} />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp size={12} color="var(--accent, #00d4aa)" /> 
+      : <ArrowDown size={12} color="var(--accent, #00d4aa)" />;
+  };
 
   const gainers = [...stocks]
     .filter(s => !s.symbol.startsWith('^') && s.changePct !== null && s.changePct > 0)
@@ -47,6 +171,7 @@ export default function MarketOverview({ stocks, onSelectStock }) {
 
   const filterOptions = [
     { id: 'ALL', label: 'All Stocks' },
+    { id: 'WATCHLIST', label: `★ Watchlist (${watchlist.length})` },
     { id: 'GAINERS', label: 'Top Gainers' },
     { id: 'LOSERS', label: 'Top Losers' },
     { id: 'BANKING', label: 'Banking' },
@@ -56,13 +181,13 @@ export default function MarketOverview({ stocks, onSelectStock }) {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
       {/* Index Hero Banners (CLICKABLE TO OPEN CHART MODAL) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+      <div className="index-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
         {[
-          { symbol: '^NSEI', name: 'NIFTY 50', data: nifty, desc: 'Benchmark National Stock Exchange 50 • Click to View Chart' },
-          { symbol: '^NSEBANK', name: 'NIFTY BANK', data: bankNifty, desc: '12 Banking Super-Weights Index • Click to View Chart' }
+          { symbol: '^NSEI', name: 'NIFTY 50', data: nifty },
+          { symbol: '^NSEBANK', name: 'NIFTY BANK', data: bankNifty }
         ].map((idx) => {
           const isUp = (idx.data?.changePct ?? 0) >= 0;
           return (
@@ -70,39 +195,35 @@ export default function MarketOverview({ stocks, onSelectStock }) {
               key={idx.symbol}
               onClick={() => setModalIndex({ symbol: idx.symbol, title: idx.name })}
               style={{
-                background: 'linear-gradient(145deg, var(--bg-card, #1a1d23), #161a22)',
+                background: 'linear-gradient(135deg, #1a1d23, #22252d)',
                 border: '1px solid var(--border, #2a2d35)',
-                borderRadius: '12px',
-                padding: '1.25rem 1.5rem',
+                borderRadius: '10px',
+                padding: '1.1rem 1.4rem',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = 'var(--accent, #00d4aa)';
-                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = 'var(--border, #2a2d35)';
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
-              title="Click to view interactive candlestick chart"
             >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #8b949e)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #888888)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
                     {idx.name}
-                  </div>
-                  <LineChart size={14} color="var(--accent, #00d4aa)" />
+                  </span>
+                  <LineChart size={13} color="var(--accent, #00d4aa)" />
                 </div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 800, margin: '4px 0' }}>
+                <div style={{ fontSize: '1.65rem', fontWeight: 700, margin: '2px 0', color: '#ffffff' }}>
                   ₹{idx.data?.price ? Number(idx.data.price).toLocaleString('en-IN') : 'Loading...'}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--accent, #00d4aa)', fontWeight: 600 }}>
-                  📈 Click to inspect performance graph
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -110,14 +231,14 @@ export default function MarketOverview({ stocks, onSelectStock }) {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
-                  padding: '6px 12px',
-                  borderRadius: '20px',
-                  background: isUp ? 'rgba(46, 213, 115, 0.15)' : 'rgba(255, 71, 87, 0.15)',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  background: isUp ? 'rgba(46, 213, 115, 0.12)' : 'rgba(255, 71, 87, 0.12)',
                   color: isUp ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)',
                   fontWeight: 700,
-                  fontSize: '0.95rem'
+                  fontSize: '0.88rem'
                 }}>
-                  {isUp ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                  {isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                   {isUp ? '+' : ''}{idx.data?.change?.toFixed(2) ?? '0.00'} ({idx.data?.changePct?.toFixed(2) ?? '0.00'}%)
                 </div>
               </div>
@@ -127,39 +248,36 @@ export default function MarketOverview({ stocks, onSelectStock }) {
       </div>
 
       {/* Main Grid: Stocks Table + Gainers/Losers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2.2fr) minmax(300px, 1fr)', gap: '1.5rem' }}>
+      <div className="responsive-grid-main" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2.3fr) minmax(280px, 1fr)', gap: '1.25rem' }}>
         
-        {/* Left: Interactive Stock Table */}
+        {/* Left: Interactive All Stocks Table */}
         <div style={{
           background: 'var(--bg-card, #1a1d23)',
           border: '1px solid var(--border, #2a2d35)',
-          borderRadius: '12px',
-          padding: '1.25rem',
+          borderRadius: '10px',
+          padding: '1.2rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '1rem'
+          gap: '0.85rem'
         }}>
           {/* Header & Search */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0 }}>NSE Liquid Bluechips</h2>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)', marginTop: '2px' }}>
-                Click any stock to inspect its chart, price action & fundamentals (AI optional)
-              </div>
-            </div>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#ffffff' }}>
+              All Stocks
+            </h2>
 
             {/* Search Input */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              background: 'var(--bg-secondary, #22252d)',
+              gap: '6px',
+              background: 'var(--bg-bar, #12141a)',
               border: '1px solid var(--border, #2a2d35)',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              width: '240px'
+              borderRadius: '6px',
+              padding: '4px 10px',
+              width: '220px'
             }}>
-              <Search size={15} color="var(--text-muted, #8b949e)" />
+              <Search size={14} color="var(--text-muted, #888888)" />
               <input
                 type="text"
                 placeholder="Search stocks..."
@@ -169,8 +287,8 @@ export default function MarketOverview({ stocks, onSelectStock }) {
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  color: 'var(--text-main, #f0f2f5)',
-                  fontSize: '0.85rem',
+                  color: 'var(--text-main, #d1d5db)',
+                  fontSize: '0.8rem',
                   width: '100%'
                 }}
               />
@@ -184,13 +302,13 @@ export default function MarketOverview({ stocks, onSelectStock }) {
                 key={f.id}
                 onClick={() => setActiveFilter(f.id)}
                 style={{
-                  background: activeFilter === f.id ? 'var(--accent, #00d4aa)' : 'var(--bg-secondary, #22252d)',
-                  color: activeFilter === f.id ? '#0f1117' : 'var(--text-main, #f0f2f5)',
+                  background: activeFilter === f.id ? 'var(--accent, #00d4aa)' : 'rgba(255,255,255,0.04)',
+                  color: activeFilter === f.id ? '#0f1117' : 'var(--text-muted, #888888)',
                   border: `1px solid ${activeFilter === f.id ? 'var(--accent, #00d4aa)' : 'var(--border, #2a2d35)'}`,
-                  borderRadius: '20px',
-                  padding: '4px 12px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
+                  borderRadius: '6px',
+                  padding: '3px 10px',
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
@@ -200,29 +318,69 @@ export default function MarketOverview({ stocks, onSelectStock }) {
             ))}
           </div>
 
-          {/* Stocks Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+          {/* Stocks Table with Click-to-Sort Headers & Trend Sparklines */}
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border, #2a2d35)', color: 'var(--text-muted, #8b949e)', fontSize: '0.75rem' }}>
-                  <th style={{ padding: '10px 8px' }}>TICKER</th>
-                  <th style={{ padding: '10px 8px' }}>COMPANY</th>
-                  <th style={{ padding: '10px 8px', textAlign: 'right' }}>LTP (₹)</th>
-                  <th style={{ padding: '10px 8px', textAlign: 'right' }}>CHANGE</th>
-                  <th style={{ padding: '10px 8px', textAlign: 'right' }}>% CHANGE</th>
-                  <th style={{ padding: '10px 8px', textAlign: 'center' }}>ACTION</th>
+                <tr style={{ borderBottom: '1px solid var(--border, #2a2d35)', color: 'var(--text-muted, #888888)', fontSize: '0.72rem', userSelect: 'none' }}>
+                  <th 
+                    onClick={() => handleSort('symbol')}
+                    style={{ padding: '8px 8px', cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      SYMBOL {renderSortIndicator('symbol')}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('name')}
+                    style={{ padding: '8px 8px', cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      COMPANY {renderSortIndicator('name')}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('price')}
+                    style={{ padding: '8px 8px', textAlign: 'right', cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
+                      MARKET PRICE (₹) {renderSortIndicator('price')}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('change')}
+                    style={{ padding: '8px 8px', textAlign: 'right', cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
+                      CHANGE {renderSortIndicator('change')}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('changePct')}
+                    style={{ padding: '8px 8px', textAlign: 'right', cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
+                      % CHANGE {renderSortIndicator('changePct')}
+                    </div>
+                  </th>
+                  <th style={{ padding: '8px 16px 8px 16px', textAlign: 'right', minWidth: '120px' }}>
+                    <div style={{ display: 'inline-flex', justifyContent: 'flex-end', width: '100px' }}>
+                      TREND
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {filteredStocks.length === 0 ? (
+                {sortedStocks.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted, #8b949e)' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted, #888888)' }}>
                       No stocks found matching the filter or search query.
                     </td>
                   </tr>
                 ) : (
-                  filteredStocks.map((stock) => {
+                  sortedStocks.map((stock) => {
                     const isUp = (stock.changePct ?? 0) >= 0;
+                    const isWatched = watchlist.includes(stock.symbol);
                     return (
                       <tr
                         key={stock.symbol}
@@ -230,57 +388,60 @@ export default function MarketOverview({ stocks, onSelectStock }) {
                         style={{
                           borderBottom: '1px solid rgba(42, 45, 53, 0.4)',
                           cursor: 'pointer',
-                          transition: 'background 0.15s'
+                          transition: 'background 0.12s'
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       >
-                        <td style={{ padding: '12px 8px', fontWeight: 700, color: 'var(--text-main, #f0f2f5)' }}>
-                          {stock.symbol.replace('.NS', '')}
+                        <td style={{ padding: '10px 8px', fontWeight: 600, color: '#ffffff' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleWatchlist && onToggleWatchlist(stock.symbol);
+                              }}
+                              title={isWatched ? "Remove from Watchlist" : "Add to Watchlist"}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '2px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                color: isWatched ? '#f59e0b' : 'rgba(255, 255, 255, 0.25)',
+                                transition: 'color 0.15s ease'
+                              }}
+                            >
+                              <Star size={14} fill={isWatched ? '#f59e0b' : 'none'} />
+                            </button>
+                            <span>{stock.symbol.replace('.NS', '')}</span>
+                          </div>
                         </td>
-                        <td style={{ padding: '12px 8px', color: 'var(--text-muted, #8b949e)' }}>
+                        <td style={{ padding: '10px 8px', color: 'var(--text-muted, #888888)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {stock.name}
                         </td>
-                        <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 600, color: 'var(--text-main, #d1d5db)' }}>
                           ₹{stock.price ? Number(stock.price).toLocaleString('en-IN') : '—'}
                         </td>
-                        <td style={{ padding: '12px 8px', textAlign: 'right', color: isUp ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)' }}>
+                        <td style={{ padding: '10px 8px', textAlign: 'right', color: isUp ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)' }}>
                           {isUp ? '+' : ''}{stock.change ? stock.change.toFixed(2) : '0.00'}
                         </td>
-                        <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                        <td style={{ padding: '10px 8px', textAlign: 'right' }}>
                           <span style={{
-                            padding: '3px 8px',
+                            padding: '2px 6px',
                             borderRadius: '4px',
-                            fontSize: '0.78rem',
+                            fontSize: '0.75rem',
                             fontWeight: 700,
-                            background: isUp ? 'rgba(46, 213, 115, 0.15)' : 'rgba(255, 71, 87, 0.15)',
+                            background: isUp ? 'rgba(46, 213, 115, 0.12)' : 'rgba(255, 71, 87, 0.12)',
                             color: isUp ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)'
                           }}>
                             {isUp ? '▲' : '▼'} {Math.abs(stock.changePct ?? 0).toFixed(2)}%
                           </span>
                         </td>
-                        <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectStock(stock.symbol);
-                            }}
-                            style={{
-                              background: 'var(--bg-secondary, #22252d)',
-                              border: '1px solid var(--border, #2a2d35)',
-                              color: 'var(--accent, #00d4aa)',
-                              padding: '5px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Chart & Details <ArrowUpRight size={12} />
-                          </button>
+                        <td style={{ padding: '6px 16px 6px 16px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', justifyContent: 'flex-end', width: '100px' }}>
+                            <MiniTrendSparkline symbol={stock.symbol} changePct={stock.changePct} />
+                          </div>
                         </td>
                       </tr>
                     );
@@ -298,13 +459,13 @@ export default function MarketOverview({ stocks, onSelectStock }) {
           <div style={{
             background: 'var(--bg-card, #1a1d23)',
             border: '1px solid var(--border, #2a2d35)',
-            borderRadius: '12px',
-            padding: '1.25rem'
+            borderRadius: '10px',
+            padding: '1.1rem'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: 'var(--green, #2ed573)', fontWeight: 700, fontSize: '0.9rem' }}>
-              <TrendingUp size={18} /> Top Gainers Today
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.85rem', color: 'var(--green, #2ed573)', fontWeight: 700, fontSize: '0.85rem' }}>
+              <TrendingUp size={16} /> Top Gainers Today
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
               {gainers.map((g) => (
                 <div
                   key={g.symbol}
@@ -313,20 +474,21 @@ export default function MarketOverview({ stocks, onSelectStock }) {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-secondary, #22252d)',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-bar, #12141a)',
+                    border: '1px solid rgba(42, 45, 53, 0.5)',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease'
+                    transition: 'border-color 0.15s ease'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent, #00d4aa)'}
-                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'transparent'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(42, 45, 53, 0.5)'}
                 >
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{g.symbol.replace('.NS', '')}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #8b949e)' }}>₹{g.price}</div>
+                    <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#fff' }}>{g.symbol.replace('.NS', '')}</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>₹{g.price}</div>
                   </div>
-                  <div style={{ color: 'var(--green, #2ed573)', fontWeight: 700, fontSize: '0.85rem' }}>
+                  <div style={{ color: 'var(--green, #2ed573)', fontWeight: 700, fontSize: '0.82rem' }}>
                     +{g.changePct?.toFixed(2)}%
                   </div>
                 </div>
@@ -338,13 +500,13 @@ export default function MarketOverview({ stocks, onSelectStock }) {
           <div style={{
             background: 'var(--bg-card, #1a1d23)',
             border: '1px solid var(--border, #2a2d35)',
-            borderRadius: '12px',
-            padding: '1.25rem'
+            borderRadius: '10px',
+            padding: '1.1rem'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: 'var(--red, #ff4757)', fontWeight: 700, fontSize: '0.9rem' }}>
-              <TrendingDown size={18} /> Top Losers Today
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.85rem', color: 'var(--red, #ff4757)', fontWeight: 700, fontSize: '0.85rem' }}>
+              <TrendingDown size={16} /> Top Losers Today
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
               {losers.map((l) => (
                 <div
                   key={l.symbol}
@@ -353,20 +515,21 @@ export default function MarketOverview({ stocks, onSelectStock }) {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-secondary, #22252d)',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-bar, #12141a)',
+                    border: '1px solid rgba(42, 45, 53, 0.5)',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease'
+                    transition: 'border-color 0.15s ease'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent, #00d4aa)'}
-                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'transparent'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(42, 45, 53, 0.5)'}
                 >
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{l.symbol.replace('.NS', '')}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #8b949e)' }}>₹{l.price}</div>
+                    <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#fff' }}>{l.symbol.replace('.NS', '')}</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>₹{l.price}</div>
                   </div>
-                  <div style={{ color: 'var(--red, #ff4757)', fontWeight: 700, fontSize: '0.85rem' }}>
+                  <div style={{ color: 'var(--red, #ff4757)', fontWeight: 700, fontSize: '0.82rem' }}>
                     {l.changePct?.toFixed(2)}%
                   </div>
                 </div>

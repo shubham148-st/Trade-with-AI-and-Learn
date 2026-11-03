@@ -98,7 +98,7 @@ def cleanup():
 
 def main():
     print("=======================================================================")
-    print("  NSE QUANTPRO - ALL-IN-ONE SIMULATION & TRADING RUNNER")
+    print("  TAIL (Trade with AI and Learn) - QUANT & TRADING RUNNER")
     print("=======================================================================")
     print("  * Backend: Flask API + yfinance Streaming Engine (Port 5500)")
     print("  * Frontend: React 19 + Vite Modern Web UI (Port 5173)")
