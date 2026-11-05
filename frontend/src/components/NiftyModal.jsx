@@ -278,8 +278,8 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
           timeVisible: true,
           secondsVisible: false,
         },
-        width: chartContainerRef.current.clientWidth,
-        height: 420,
+        width: chartContainerRef.current.clientWidth || 300,
+        height: chartContainerRef.current.clientHeight || (window.innerWidth <= 768 ? 300 : 420),
       });
 
       createMainSeries(chart, chartType);
@@ -365,15 +365,26 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
 
       const handleResize = () => {
         if (chartContainerRef.current) {
-          chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+          chart.applyOptions({ 
+            width: chartContainerRef.current.clientWidth,
+            height: chartContainerRef.current.clientHeight || (window.innerWidth <= 768 ? 300 : 420)
+          });
         }
       };
       window.addEventListener('resize', handleResize);
+
+      const resizeObserver = new ResizeObserver(() => {
+        handleResize();
+      });
+      if (chartContainerRef.current) {
+        resizeObserver.observe(chartContainerRef.current);
+      }
 
       fetchChartData(period, interval, chartType);
 
       return () => {
         window.removeEventListener('resize', handleResize);
+        resizeObserver.disconnect();
         chart.remove();
       };
     } catch (err) {
@@ -598,7 +609,7 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
         )}
 
         {/* Chart View with Groww Floating Info Overlay */}
-        <div style={{ position: 'relative', width: '100%', height: '420px', background: '#12141a' }}>
+        <div className="nifty-modal-canvas" style={{ position: 'relative', width: '100%', maxWidth: '100%', background: '#12141a', overflow: 'hidden' }}>
           
           {chartType !== 'candlestick' && hoveredPoint && (
             <div style={{

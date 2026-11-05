@@ -233,8 +233,8 @@ export default function StockPage({
           timeVisible: true,
           secondsVisible: false,
         },
-        width: chartContainerRef.current.clientWidth,
-        height: 440,
+        width: chartContainerRef.current.clientWidth || 300,
+        height: chartContainerRef.current.clientHeight || (window.innerWidth <= 768 ? 320 : 440),
       });
 
       // Default series: Line & Dots with hover dot
@@ -323,15 +323,26 @@ export default function StockPage({
 
       const handleResize = () => {
         if (chartContainerRef.current) {
-          chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+          chart.applyOptions({ 
+            width: chartContainerRef.current.clientWidth,
+            height: chartContainerRef.current.clientHeight || (window.innerWidth <= 768 ? 320 : 440)
+          });
         }
       };
       window.addEventListener('resize', handleResize);
+
+      const resizeObserver = new ResizeObserver(() => {
+        handleResize();
+      });
+      if (chartContainerRef.current) {
+        resizeObserver.observe(chartContainerRef.current);
+      }
 
       fetchCandles(period, interval, chartType);
 
       return () => {
         window.removeEventListener('resize', handleResize);
+        resizeObserver.disconnect();
         chart.remove();
       };
     } catch (e) {
@@ -719,7 +730,7 @@ export default function StockPage({
         )}
 
         {/* Chart View with Groww Floating Info Pill */}
-        <div style={{ position: 'relative', width: '100%', height: '440px', background: '#12141a' }}>
+        <div className="chart-canvas-container" style={{ position: 'relative', width: '100%', maxWidth: '100%', background: '#12141a', overflow: 'hidden' }}>
           
           {/* Floating hover card for Line mode */}
           {chartType !== 'candlestick' && hoveredPoint && (

@@ -255,7 +255,7 @@ export default function PaperTrading({ stocks, prefilledOrder, onOrderDone }) {
             </span>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-responsive-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'left' }}>
