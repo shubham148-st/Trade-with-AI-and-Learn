@@ -1,0 +1,7 @@
+
+__pycache__/
+*.py[cod]
+*$py.class
+quotes_cache.json
+paper_state.json
+

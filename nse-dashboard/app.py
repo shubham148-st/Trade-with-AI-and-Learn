@@ -495,7 +495,7 @@ def analysis_live(symbol):
         return jsonify({"error": str(e)}), 500
 
 
-from algo_kb import ALGO_DIRECTORY
+from algo_kb import ALGO_DIRECTORY, get_observed_feed
 from paper_trading import (
     get_paper_summary, execute_order, auto_paper_trade_signals, reset_paper_account
 )
@@ -505,6 +505,14 @@ from paper_trading import (
 def get_algos():
     """Returns directory of algorithmic strategies with rules and beginner explanations."""
     return jsonify(list(ALGO_DIRECTORY.values()))
+
+
+@app.route("/api/algos/observed")
+def get_observed_algos():
+    """Returns detected and historical observed algo instances across the past 6 weeks and today."""
+    filter_type = request.args.get("filter", "1D")
+    pattern_id = request.args.get("pattern", "ALL")
+    return jsonify(get_observed_feed(filter_type, pattern_id))
 
 
 @app.route("/api/algos/<algo_id>")

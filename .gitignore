@@ -4,7 +4,6 @@ GEMINI.md
 __pycache__/
 *.py[cod]
 *$py.class
-nse-dashboard/quotes_cache.json
-nse-dashboard/paper_state.json
 node_modules/
 .venv/
+nse-dashboard/__pycache__/algo_kb.cpython-313.pyc
