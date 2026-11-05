@@ -105,33 +105,41 @@ def main():
     print("  * Paper Trading: 10 Lakh Virtual Capital + Auto Risk Guardrails")
     print("=======================================================================")
 
-    # 1. Start Flask Backend
-    log("Starting Flask Quant & Streaming Engine on port 5500...", "INIT")
-    app_py = os.path.join(BACKEND_DIR, "app.py")
-    flask_proc = subprocess.Popen(
-        [sys.executable, app_py],
-        cwd=BACKEND_DIR
-    )
-    processes.append(flask_proc)
+    # 1. Start Flask Backend (or reuse if active)
+    backend_already_up = check_service_ready(f"{BACKEND_URL}/api/health", timeout=1)
+    if backend_already_up:
+        log("Flask Quant & Streaming Engine is already running on port 5500.", "OK")
+    else:
+        log("Starting Flask Quant & Streaming Engine on port 5500...", "INIT")
+        app_py = os.path.join(BACKEND_DIR, "app.py")
+        flask_proc = subprocess.Popen(
+            [sys.executable, app_py],
+            cwd=BACKEND_DIR
+        )
+        processes.append(flask_proc)
 
-    # 2. Start Vite Frontend
-    log("Starting React Vite Web Application on port 5173...", "INIT")
-    npx_cmd = "npx.cmd" if sys.platform == "win32" else "npx"
-    vite_proc = subprocess.Popen(
-        [npx_cmd, "vite", "--port", "5173", "--host", "127.0.0.1"],
-        cwd=FRONTEND_DIR
-    )
-    processes.append(vite_proc)
+    # 2. Start Vite Frontend (or reuse if active)
+    frontend_already_up = check_service_ready(FRONTEND_URL, timeout=1)
+    if frontend_already_up:
+        log("React Vite Web Application is already running on port 5173.", "OK")
+    else:
+        log("Starting React Vite Web Application on port 5173...", "INIT")
+        npx_cmd = "npx.cmd" if sys.platform == "win32" else "npx"
+        vite_proc = subprocess.Popen(
+            [npx_cmd, "vite", "--port", "5173", "--host", "127.0.0.1"],
+            cwd=FRONTEND_DIR
+        )
+        processes.append(vite_proc)
 
     # 3. Wait for services to be ready
-    log("Waiting for backend API to initialize...", "WAIT")
-    if check_service_ready(f"{BACKEND_URL}/api/batch_quotes", timeout=30):
+    log("Verifying backend API health probe...", "WAIT")
+    if backend_already_up or check_service_ready(f"{BACKEND_URL}/api/health", timeout=30):
         log("Flask Backend is LIVE and healthy on http://127.0.0.1:5500", "OK")
     else:
         log("Backend warning: API took longer than expected to report ready.", "WARN")
 
-    log("Waiting for React Vite server...", "WAIT")
-    if check_service_ready(FRONTEND_URL, timeout=20):
+    log("Verifying React Vite server...", "WAIT")
+    if frontend_already_up or check_service_ready(FRONTEND_URL, timeout=20):
         log("React Frontend is LIVE on http://127.0.0.1:5173", "OK")
     else:
         log("Frontend warning: Vite took longer to initialize.", "WARN")

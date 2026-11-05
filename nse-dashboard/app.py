@@ -6,7 +6,8 @@ Serves real-time and historical NSE data from Yahoo Finance.
 import json
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor
+import threading
+from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -24,6 +25,40 @@ _QUOTES_CACHE = {
     "data": []
 }
 _HISTORY_CACHE = {}  # key: (symbol, period, interval) -> { "timestamp": float, "payload": dict }
+
+class CircuitBreaker:
+    """Thread-safe circuit breaker preventing cascading failures to yfinance."""
+    def __init__(self, failure_threshold=5, recovery_timeout=30.0):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failure_count = 0
+        self.last_failure_time = 0.0
+        self.state = "CLOSED"
+        self._lock = threading.Lock()
+
+    def can_execute(self):
+        with self._lock:
+            if self.state == "OPEN":
+                if time.time() - self.last_failure_time > self.recovery_timeout:
+                    self.state = "HALF_OPEN"
+                    return True
+                return False
+            return True
+
+    def record_success(self):
+        with self._lock:
+            self.failure_count = 0
+            self.state = "CLOSED"
+
+    def record_failure(self):
+        with self._lock:
+            self.failure_count += 1
+            self.last_failure_time = time.time()
+            if self.failure_count >= self.failure_threshold:
+                self.state = "OPEN"
+
+_YF_CIRCUIT = CircuitBreaker(failure_threshold=5, recovery_timeout=25.0)
+
 
 if os.path.exists(CACHE_FILE):
     try:
@@ -126,6 +161,21 @@ def get_sectors():
     return jsonify(SECTOR_MAP)
 
 
+@app.route("/api/health")
+def api_health():
+    """Health check endpoint to probe backend status, cache state, and uptime."""
+    return jsonify({
+        "status": "ok",
+        "service": "nse-quant-backend",
+        "port": int(os.environ.get("PORT", 5500)),
+        "circuit_breaker": _YF_CIRCUIT.state,
+        "cached_symbols_count": len(_QUOTES_CACHE.get("data", [])),
+        "cache_age_seconds": round(time.time() - _QUOTES_CACHE["timestamp"], 1) if _QUOTES_CACHE.get("timestamp") else None,
+        "timestamp": time.time()
+    })
+
+
+
 @app.route("/api/quote/<symbol>")
 def get_quote(symbol):
     """Get real-time quote for a single stock."""
@@ -164,14 +214,21 @@ def get_quote(symbol):
 
 @app.route("/api/batch_quotes")
 def batch_quotes():
-    """Get quick quotes for all tracked stocks. Fast with parallel threads and cache."""
+    """Get quick quotes for all tracked stocks with circuit breaker, timeout protection and cache fallback."""
     force = request.args.get("force", "0") == "1"
     now = time.time()
 
+    # 1. Immediate cache return if fresh
     if not force and _QUOTES_CACHE["data"] and (now - _QUOTES_CACHE["timestamp"] < 60):
         return jsonify(_QUOTES_CACHE["data"])
 
+    # 2. Circuit breaker check: if upstream is open, immediately return cached data
+    if not _YF_CIRCUIT.can_execute():
+        if _QUOTES_CACHE["data"]:
+            return jsonify(_QUOTES_CACHE["data"])
+
     symbols = list(NSE_STOCKS.keys())
+    existing_map = {item["symbol"]: item for item in _QUOTES_CACHE.get("data", []) if isinstance(item, dict) and "symbol" in item}
 
     def fetch_single(sym):
         try:
@@ -183,26 +240,44 @@ def batch_quotes():
             change_pct = round((change / prev) * 100, 2) if change and prev else None
             return {
                 "symbol": sym,
-                "name": NSE_STOCKS[sym],
+                "name": NSE_STOCKS.get(sym, sym),
                 "price": price,
                 "change": change,
                 "changePct": change_pct,
             }
         except Exception:
+            prev_cached = existing_map.get(sym)
+            if prev_cached and prev_cached.get("price") is not None:
+                return prev_cached
             return {
                 "symbol": sym,
-                "name": NSE_STOCKS[sym],
+                "name": NSE_STOCKS.get(sym, sym),
                 "price": None,
                 "change": None,
                 "changePct": None,
             }
 
     try:
+        results = []
         with ThreadPoolExecutor(max_workers=10) as executor:
-            results = list(executor.map(fetch_single, symbols))
+            future_to_sym = {executor.submit(fetch_single, sym): sym for sym in symbols}
+            done, not_done = wait(future_to_sym.keys(), timeout=10.0)
+
+            for future in done:
+                try:
+                    results.append(future.result())
+                except Exception:
+                    sym = future_to_sym[future]
+                    results.append(existing_map.get(sym, {"symbol": sym, "name": NSE_STOCKS.get(sym, sym), "price": None, "change": None, "changePct": None}))
+
+            for future in not_done:
+                sym = future_to_sym[future]
+                future.cancel()
+                results.append(existing_map.get(sym, {"symbol": sym, "name": NSE_STOCKS.get(sym, sym), "price": None, "change": None, "changePct": None}))
 
         has_prices = any(r.get("price") is not None for r in results)
         if has_prices:
+            _YF_CIRCUIT.record_success()
             _QUOTES_CACHE["data"] = results
             _QUOTES_CACHE["timestamp"] = now
             try:
@@ -211,10 +286,13 @@ def batch_quotes():
             except Exception:
                 pass
             return jsonify(results)
-        elif _QUOTES_CACHE["data"]:
-            return jsonify(_QUOTES_CACHE["data"])
-        return jsonify(results)
+        else:
+            _YF_CIRCUIT.record_failure()
+            if _QUOTES_CACHE["data"]:
+                return jsonify(_QUOTES_CACHE["data"])
+            return jsonify(results)
     except Exception as e:
+        _YF_CIRCUIT.record_failure()
         if _QUOTES_CACHE["data"]:
             return jsonify(_QUOTES_CACHE["data"])
         return jsonify({"error": str(e)}), 500

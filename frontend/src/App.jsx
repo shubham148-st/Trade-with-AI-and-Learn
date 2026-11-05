@@ -17,6 +17,7 @@ export default function App() {
   const [prefilledOrder, setPrefilledOrder] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [watchlist, setWatchlist] = useState(() => getWatchlistFromCookies());
+  const [backendOnline, setBackendOnline] = useState(true);
 
   // Helper to resolve route and symbol from URL (Convention: /stocks/SYMBOL and /AI/SYMBOL)
   const resolveRouteFromUrl = () => {
@@ -73,6 +74,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const probeHealth = async () => {
+      try {
+        const res = await fetch('/api/health');
+        setBackendOnline(res.ok);
+      } catch {
+        setBackendOnline(false);
+      }
+    };
+    probeHealth();
     fetchStockBatch();
     const interval = setInterval(fetchStockBatch, 60000);
     return () => clearInterval(interval);
@@ -86,11 +96,16 @@ export default function App() {
     try {
       const res = await fetch('/api/batch_quotes', { signal: controller.signal });
       clearTimeout(timeoutId);
+      if (!res.ok) {
+        throw new Error(`HTTP error ${res.status}`);
+      }
       const data = await res.json();
       if (Array.isArray(data)) {
         setStocks(data);
+        setBackendOnline(true);
       }
     } catch (e) {
+      setBackendOnline(false);
       if (e.name === 'AbortError') {
         console.warn('Batch quotes timed out, maintaining existing stock cache');
       } else {
@@ -182,6 +197,49 @@ export default function App() {
         stocks={stocks}
         onSelectStock={handleSelectStock}
       />
+
+      {/* Backend Disconnected Warning Banner */}
+      {!backendOnline && (
+        <div style={{
+          background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.2) 0%, rgba(185, 28, 28, 0.25) 100%)',
+          borderBottom: '1px solid rgba(239, 68, 68, 0.5)',
+          color: '#fca5a5',
+          padding: '0.65rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.875rem',
+          backdropFilter: 'blur(8px)',
+          zIndex: 40
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+            <span>
+              <strong>Backend Offline:</strong> Flask Quant API (port 5500) is unreachable. Run <code style={{ background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: '4px', color: '#fff' }}>python nse-dashboard/app.py</code> or <code style={{ background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: '4px', color: '#fff' }}>npm run dev</code> to enable live market streaming.
+            </span>
+          </div>
+          <button 
+            onClick={fetchStockBatch}
+            disabled={isRefreshing}
+            style={{
+              background: '#ef4444',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.35rem 0.85rem',
+              cursor: isRefreshing ? 'wait' : 'pointer',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              transition: 'background 0.2s'
+            }}
+          >
+            {isRefreshing ? 'Reconnecting...' : 'Retry Connection'}
+          </button>
+        </div>
+      )}
 
       {/* Left-Moving Ticker Ribbon */}
       <TickerRibbon stocks={stocks} onSelectStock={handleSelectStock} />
