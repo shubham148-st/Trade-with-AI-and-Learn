@@ -9,7 +9,7 @@ import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import yfinance as yf
 import pandas as pd
@@ -144,7 +144,11 @@ def serve_client(path):
     if os.path.exists(os.path.join(FRONTEND_DIST, "index.html")):
         return send_from_directory(FRONTEND_DIST, "index.html")
 
-    return render_template("index.html")
+    return jsonify({
+        "status": "ok",
+        "service": "nse-quant-backend",
+        "message": "TAIL Quant Engine API is running. UI is available at http://localhost:5173"
+    })
 
 
 @app.route("/api/stocks")
@@ -437,10 +441,6 @@ from analysis_engine import (
     score_stock, scan_all, full_analysis, live_monitor,
 )
 
-
-@app.route("/analysis")
-def analysis_page():
-    return render_template("analysis.html")
 
 
 @app.route("/api/analysis/scan")

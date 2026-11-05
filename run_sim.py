@@ -112,8 +112,10 @@ def main():
     else:
         log("Starting Flask Quant & Streaming Engine on port 5500...", "INIT")
         app_py = os.path.join(BACKEND_DIR, "app.py")
+        venv_py = os.path.join(BASE_DIR, ".venv", "Scripts", "python.exe")
+        py_bin = venv_py if os.path.exists(venv_py) else sys.executable
         flask_proc = subprocess.Popen(
-            [sys.executable, app_py],
+            [py_bin, app_py],
             cwd=BACKEND_DIR
         )
         processes.append(flask_proc)
