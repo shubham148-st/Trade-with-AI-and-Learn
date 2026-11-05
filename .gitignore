@@ -4,3 +4,6 @@ GEMINI.md
 __pycache__/
 *.py[cod]
 *$py.class
+nse-dashboard/quotes_cache.json
+nse-dashboard/paper_trading.json
+node_modules/
