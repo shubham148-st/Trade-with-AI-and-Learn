@@ -92,8 +92,9 @@ export default function Navbar({
       borderBottom: '1px solid var(--border, #2a2d35)',
       position: 'sticky',
       top: 0,
-      zIndex: 100,
-      padding: '0 1.25rem'
+      zIndex: 1000,
+      padding: '0 1.25rem',
+      overflow: 'visible'
     }}>
       <div className="navbar-container" style={{
         display: 'flex',
@@ -104,50 +105,57 @@ export default function Navbar({
         margin: '0 auto',
         gap: '1rem'
       }}>
-        {/* Brand (TAIL with Official Infinity Logo) */}
+        {/* Brand (TAIL with Official Logo & Mobile Stacked Section Name) */}
         <div 
           onClick={() => setActiveTab('dashboard')}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', userSelect: 'none' }}
+          className="brand-wrapper"
+          style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer', userSelect: 'none' }}
         >
-          <img 
-            src="/tail-mark.png" 
-            alt="TAIL" 
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '6px',
-              border: '1px solid var(--border, #2a2d35)',
-              display: 'block',
-              objectFit: 'cover'
-            }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{
-              fontWeight: 800,
-              fontSize: '1.15rem',
-              letterSpacing: '0.04em',
-              color: '#ffffff'
-            }}>
-              TAIL
-            </span>
-            <span className="brand-subtext" style={{
-              color: 'var(--text-muted, #888888)',
-              fontSize: '0.82rem',
-              fontWeight: 500
-            }}>
-              Trade with AI and Learn
-            </span>
-            <span style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid var(--border, #2a2d35)',
-              color: 'var(--text-muted, #888888)',
-              fontSize: '0.65rem',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontWeight: 600
-            }}>
-              {activeTabMeta.label}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+            <img 
+              src="/tail-mark.png" 
+              alt="TAIL" 
+              style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '6px',
+                border: '1px solid var(--border, #2a2d35)',
+                display: 'block',
+                objectFit: 'cover'
+              }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                fontWeight: 800,
+                fontSize: '1.15rem',
+                letterSpacing: '0.04em',
+                color: '#ffffff'
+              }}>
+                TAIL
+              </span>
+              <span className="brand-subtext" style={{
+                color: 'var(--text-muted, #888888)',
+                fontSize: '0.82rem',
+                fontWeight: 500
+              }}>
+                Trade with AI and Learn
+              </span>
+              <span className="brand-badge-desktop" style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border, #2a2d35)',
+                color: 'var(--text-muted, #888888)',
+                fontSize: '0.65rem',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontWeight: 600
+              }}>
+                {activeTabMeta.label}
+              </span>
+            </div>
+          </div>
+          {/* Mobile View: Section name shown below the logo */}
+          <div className="brand-badge-mobile" style={{ marginTop: '2px' }}>
+            {activeTabMeta.label}
           </div>
         </div>
 
@@ -155,18 +163,19 @@ export default function Navbar({
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', position: 'relative' }}>
           
           {/* Live Ticking Clock & Market Status Badge */}
-          <div style={{
+          <div className="navbar-clock-badge" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             background: 'var(--bg-card, #1a1d23)',
             border: '1px solid var(--border, #2a2d35)',
             borderRadius: '6px',
-            padding: '4px 10px'
+            padding: '4px 10px',
+            flexShrink: 0
           }}>
             <Clock size={13} color="var(--text-muted, #888888)" />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <div style={{
+              <div className="navbar-clock-time" style={{
                 fontFamily: 'monospace',
                 fontSize: '0.78rem',
                 fontWeight: 700,
@@ -175,7 +184,7 @@ export default function Navbar({
               }}>
                 {timeString} <span style={{ fontSize: '0.65rem', color: 'var(--text-muted, #888888)' }}>IST</span>
               </div>
-              <div style={{
+              <div className="navbar-clock-status" style={{
                 fontSize: '0.62rem',
                 fontWeight: 600,
                 color: marketColor,
@@ -187,8 +196,8 @@ export default function Navbar({
             </div>
           </div>
 
-          {/* Quick Stock Finder */}
-          <div style={{ position: 'relative' }}>
+          {/* Quick Stock Finder (Desktop) */}
+          <div className="navbar-search-desktop" style={{ position: 'relative' }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -261,8 +270,9 @@ export default function Navbar({
             )}
           </div>
 
-          {/* Sync Button */}
+          {/* Sync Button (Desktop) */}
           <button
+            className="navbar-sync-desktop"
             onClick={onRefresh}
             disabled={isRefreshing}
             style={{
@@ -316,12 +326,47 @@ export default function Navbar({
                 border: '1px solid var(--border, #2a2d35)',
                 borderRadius: '10px',
                 boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6)',
-                zIndex: 250,
+                zIndex: 10000,
                 padding: '6px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '4px'
               }}>
+                {/* Sync Action inside Option Menu (Appears ONLY when top sync is hidden) */}
+                <div 
+                  className="menu-sync-mobile"
+                  style={{
+                    padding: '6px 8px',
+                    borderBottom: '1px solid rgba(42, 45, 53, 0.5)'
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      onRefresh();
+                    }}
+                    disabled={isRefreshing}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(0, 212, 170, 0.12)',
+                      border: '1px solid rgba(0, 212, 170, 0.35)',
+                      color: isRefreshing ? 'var(--accent, #00d4aa)' : 'var(--text-main, #d1d5db)',
+                      padding: '7px 12px',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      cursor: isRefreshing ? 'wait' : 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <RefreshCw size={13} className={isRefreshing ? 'spin' : ''} />
+                    <span>{isRefreshing ? 'Syncing...' : 'Sync'}</span>
+                  </button>
+                </div>
+
                 <div style={{
                   padding: '6px 10px',
                   fontSize: '0.68rem',

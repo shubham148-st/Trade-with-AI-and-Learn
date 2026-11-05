@@ -25,13 +25,23 @@
   padding: 0;
 }
 
-body {
+/* Absolute Global Prevention of Horizontal Overflow */
+html, body {
   background: var(--bg-body);
   color: var(--text-main);
   font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
-  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden !important;
+  position: relative;
+}
+
+#root {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden !important;
 }
 
 a {
@@ -80,6 +90,44 @@ button {
   background: #3b404d;
 }
 
+/* Canvas & Chart Containers Default */
+.chart-canvas-container {
+  height: 440px;
+}
+
+.nifty-modal-canvas {
+  height: 420px;
+}
+
+/* Navbar Desktop vs Mobile defaults */
+.brand-badge-desktop {
+  display: inline-block;
+}
+
+.brand-badge-mobile {
+  display: none;
+}
+
+.navbar-sync-desktop {
+  display: flex !important;
+}
+
+/* Sync button in Option Menu is hidden on desktop */
+.menu-sync-mobile {
+  display: none !important;
+}
+
+.navbar-search-desktop {
+  display: flex !important;
+}
+
+.table-responsive-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* ── Responsive Layout Rules ── */
 @media (max-width: 1024px) {
   .responsive-grid-main {
@@ -89,16 +137,87 @@ button {
 
 @media (max-width: 768px) {
   main {
-    padding: 0.75rem !important;
+    padding: 0.6rem !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
   }
   
   .navbar-container {
-    padding: 0 0.75rem !important;
-    height: 56px !important;
+    padding: 0 0.5rem !important;
+    height: 58px !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
   }
 
   .brand-subtext {
     display: none !important;
+  }
+
+  /* 1. Mobile Brand: Remove section badge from horizontal line and place below logo */
+  .brand-badge-desktop {
+    display: none !important;
+  }
+
+  .brand-badge-mobile {
+    display: inline-block !important;
+    font-size: 0.6rem !important;
+    color: var(--accent, #00d4aa) !important;
+    background: rgba(0, 212, 170, 0.1) !important;
+    border: 1px solid rgba(0, 212, 170, 0.25) !important;
+    border-radius: 4px !important;
+    padding: 1px 5px !important;
+    font-weight: 700 !important;
+    width: fit-content !important;
+    line-height: 1.15 !important;
+    margin-top: 2px !important;
+    letter-spacing: 0.02em !important;
+  }
+
+  /* 2. Sync button: When top sync button becomes hidden on mobile, show in option menu */
+  .navbar-sync-desktop {
+    display: none !important;
+  }
+
+  .menu-sync-mobile {
+    display: block !important;
+  }
+
+  /* 3. Search: Hidden on small screens so date/clock box fits cleanly without push */
+  .navbar-search-desktop {
+    display: none !important;
+  }
+
+  /* 4. Date/Clock box: Compact sizing so it NEVER overflows outside navbar */
+  .navbar-clock-badge {
+    padding: 3px 6px !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+    max-width: 135px !important;
+  }
+
+  .navbar-clock-time {
+    font-size: 0.72rem !important;
+  }
+
+  .navbar-clock-status {
+    font-size: 0.56rem !important;
+  }
+
+  /* 5. Stocks Table: Hide non-critical columns on mobile so table fits screen */
+  .col-hide-mobile {
+    display: none !important;
+  }
+
+  /* 6. Responsive Graphs: fit screen size without horizontal scrolling */
+  .chart-canvas-container {
+    height: 320px !important;
+  }
+
+  .nifty-modal-canvas {
+    height: 280px !important;
   }
 
   .index-cards-grid {

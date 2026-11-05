@@ -319,7 +319,7 @@ export default function MarketOverview({
           </div>
 
           {/* Stocks Table with Click-to-Sort Headers & Trend Sparklines */}
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div className="table-responsive-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border, #2a2d35)', color: 'var(--text-muted, #888888)', fontSize: '0.72rem', userSelect: 'none' }}>
@@ -332,6 +332,7 @@ export default function MarketOverview({
                     </div>
                   </th>
                   <th 
+                    className="col-hide-mobile"
                     onClick={() => handleSort('name')}
                     style={{ padding: '8px 8px', cursor: 'pointer' }}
                   >
@@ -348,6 +349,7 @@ export default function MarketOverview({
                     </div>
                   </th>
                   <th 
+                    className="col-hide-mobile"
                     onClick={() => handleSort('change')}
                     style={{ padding: '8px 8px', textAlign: 'right', cursor: 'pointer' }}
                   >
@@ -363,7 +365,7 @@ export default function MarketOverview({
                       % CHANGE {renderSortIndicator('changePct')}
                     </div>
                   </th>
-                  <th style={{ padding: '8px 16px 8px 16px', textAlign: 'right', minWidth: '120px' }}>
+                  <th className="col-hide-mobile" style={{ padding: '8px 16px 8px 16px', textAlign: 'right', minWidth: '120px' }}>
                     <div style={{ display: 'inline-flex', justifyContent: 'flex-end', width: '100px' }}>
                       TREND
                     </div>
@@ -417,13 +419,13 @@ export default function MarketOverview({
                             <span>{stock.symbol.replace('.NS', '')}</span>
                           </div>
                         </td>
-                        <td style={{ padding: '10px 8px', color: 'var(--text-muted, #888888)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <td className="col-hide-mobile" style={{ padding: '10px 8px', color: 'var(--text-muted, #888888)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {stock.name}
                         </td>
                         <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 600, color: 'var(--text-main, #d1d5db)' }}>
                           ₹{stock.price ? Number(stock.price).toLocaleString('en-IN') : '—'}
                         </td>
-                        <td style={{ padding: '10px 8px', textAlign: 'right', color: isUp ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)' }}>
+                        <td className="col-hide-mobile" style={{ padding: '10px 8px', textAlign: 'right', color: isUp ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)' }}>
                           {isUp ? '+' : ''}{stock.change ? stock.change.toFixed(2) : '0.00'}
                         </td>
                         <td style={{ padding: '10px 8px', textAlign: 'right' }}>
@@ -438,7 +440,7 @@ export default function MarketOverview({
                             {isUp ? '▲' : '▼'} {Math.abs(stock.changePct ?? 0).toFixed(2)}%
                           </span>
                         </td>
-                        <td style={{ padding: '6px 16px 6px 16px', textAlign: 'right' }}>
+                        <td className="col-hide-mobile" style={{ padding: '6px 16px 6px 16px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', justifyContent: 'flex-end', width: '100px' }}>
                             <MiniTrendSparkline symbol={stock.symbol} changePct={stock.changePct} />
                           </div>
