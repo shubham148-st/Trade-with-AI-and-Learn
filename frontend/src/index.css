@@ -133,6 +133,9 @@ button {
   .responsive-grid-main {
     grid-template-columns: 1fr !important;
   }
+  .algo-grid-container {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 @media (max-width: 768px) {
@@ -245,5 +248,262 @@ button {
     overflow-x: auto;
     width: 100%;
     padding-bottom: 4px;
+  }
+}
+
+/* Invisible Smooth Scrollbar Utility */
+.hide-scrollbar {
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Smooth Sliding Toggle Container */
+.sliding-seg-container {
+  position: relative;
+  display: inline-flex;
+  background: var(--bg-bar, #12141a);
+  border: 1px solid var(--border, #2a2d35);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.sliding-seg-btn {
+  position: relative;
+  z-index: 2;
+  border: none;
+  background: transparent;
+  padding: 5px 14px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+/* -- AlgoAcademy Responsive & Layout Engine -- */
+.algo-header-hero {
+  background: linear-gradient(135deg, var(--bg-card, #1a1d23) 0%, #161820 100%);
+  border: 1px solid var(--border, #2a2d35);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.algo-header-badges {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.algo-header-badge-item {
+  background: var(--bg-secondary, #14171d);
+  border: 1px solid var(--border, #2a2d35);
+  border-radius: 8px;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.algo-grid-container {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.algo-column-card {
+  position: relative;
+  background: var(--bg-card, #1a1d23);
+  border: 1px solid var(--border, #2a2d35);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  height: clamp(580px, calc(100vh - 225px), 760px);
+  overflow: hidden;
+}
+
+.algo-scroll-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 4px;
+}
+
+/* ── Hover / Inspection Overlay: Zero Blur, Snappy Opposite-Column Overlay ── */
+.algo-column-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: #141720;
+  border: 1px solid var(--accent, #00d4aa);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  animation: algoFadeIn 0.1s ease-out;
+}
+
+@keyframes algoFadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.algo-modal-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-top: 2px;
+}
+
+.algo-modal-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: #12141a;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #2a2d35);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 1024px) {
+  .algo-grid-container {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+  }
+  .algo-column-card {
+    height: auto !important;
+    min-height: unset !important;
+    padding: 1.1rem !important;
+    overflow: visible !important;
+  }
+  .algo-scroll-list {
+    max-height: 420px !important;
+    height: 390px !important;
+  }
+  .algo-column-overlay {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    bottom: auto !important;
+    right: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: 95vw !important;
+    max-width: 520px !important;
+    max-height: 85vh !important;
+    z-index: 3000 !important;
+    padding: 1.1rem !important;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, 0.9) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .algo-header-hero {
+    padding: 0.9rem !important;
+    gap: 0.75rem !important;
+  }
+  .algo-header-hero h2 {
+    font-size: 1.15rem !important;
+    line-height: 1.3 !important;
+  }
+  .algo-header-badges {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+  }
+  .algo-header-badge-item {
+    padding: 6px 4px !important;
+    width: 100% !important;
+  }
+  .algo-column-card {
+    padding: 0.9rem !important;
+  }
+  .algo-scroll-list {
+    max-height: 380px !important;
+    height: 350px !important;
+  }
+  .algo-column-overlay {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 85vh !important;
+    padding: 1rem !important;
+    gap: 0.65rem !important;
+  }
+  .algo-modal-rules-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.4rem !important;
+  }
+  .algo-modal-metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+}
+
+
+/* Desktop only inline elements */
+.desktop-only-inline {
+  display: inline;
+}
+
+@media (max-width: 768px) {
+  .desktop-only-inline {
+    display: none !important;
+  }
+  .table-responsive-wrapper table th {
+    padding: 6px 4px !important;
+    font-size: 0.69rem !important;
+    letter-spacing: -0.01em !important;
+  }
+  .table-responsive-wrapper table td {
+    padding: 8px 4px !important;
+    font-size: 0.78rem !important;
+  }
+  .algo-control-group {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .algo-control-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .sliding-seg-container {
+    width: 100% !important;
+    display: flex !important;
+  }
+  .sliding-seg-btn {
+    flex: 1 !important;
+    text-align: center !important;
+    padding: 5px 2px !important;
+    font-size: 0.7rem !important;
   }
 }
