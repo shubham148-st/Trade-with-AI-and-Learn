@@ -3,7 +3,7 @@ import Navbar from './components/Navbar';
 import TickerRibbon from './components/TickerRibbon';
 import MarketOverview from './components/MarketOverview';
 import StockPage from './components/StockPage';
-import AIAnalysis from './components/AIAnalysis';
+import AICommandCenter from './components/AICommandCenter';
 import PaperTrading from './components/PaperTrading';
 import AlgoAcademy from './components/AlgoAcademy';
 import Footer from './components/Footer';
@@ -277,7 +277,7 @@ export default function App() {
         )}
 
         {activeTab === 'ai-analysis' && (
-          <AIAnalysis 
+          <AICommandCenter 
             selectedSymbol={selectedStockSymbol || 'RELIANCE.NS'}
             onSelectSymbol={handleSelectStockForAI}
             onNavigateToAlgo={handleNavigateToAlgo}
