@@ -153,7 +153,9 @@ def news_agent(symbol):
 def historical_agent(symbol):
     try:
         hist = yf.Ticker(symbol).history(period="6mo")
-        if hist.empty or len(hist) < 30:
+        if hist is not None and not hist.empty:
+            hist = hist.dropna(subset=["Close", "High", "Low"])
+        if hist is None or hist.empty or len(hist) < 20:
             return {"score": 50, "trend": "unknown", "summary": "Insufficient data"}
 
         c, h, l, v = hist["Close"], hist["High"], hist["Low"], hist["Volume"]
@@ -211,7 +213,9 @@ def historical_agent(symbol):
 def strategy_agent(symbol):
     try:
         hist = yf.Ticker(symbol).history(period="3mo")
-        if hist.empty or len(hist) < 30:
+        if hist is not None and not hist.empty:
+            hist = hist.dropna(subset=["Close", "High", "Low"])
+        if hist is None or hist.empty or len(hist) < 20:
             return {"score": 50, "signal": "hold", "confidence": 0,
                     "summary": "Insufficient data"}
 
@@ -370,7 +374,9 @@ def _sf(v):
 def full_analysis(symbol, stock_dict):
     ticker = yf.Ticker(symbol)
     hist = ticker.history(period="6mo")
-    if hist.empty:
+    if hist is not None and not hist.empty:
+        hist = hist.dropna(subset=["Close", "High", "Low"])
+    if hist is None or hist.empty:
         return {"error": "No data"}
 
     c, h_s, l_s, vol = hist["Close"], hist["High"], hist["Low"], hist["Volume"]

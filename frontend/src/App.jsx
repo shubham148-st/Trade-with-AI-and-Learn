@@ -91,7 +91,7 @@ export default function App() {
   const fetchStockBatch = async () => {
     setIsRefreshing(true);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout guard
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // Generous 20s timeout guard
 
     try {
       const res = await fetch('/api/batch_quotes', { signal: controller.signal });
@@ -100,16 +100,18 @@ export default function App() {
         throw new Error(`HTTP error ${res.status}`);
       }
       const data = await res.json();
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         setStocks(data);
         setBackendOnline(true);
       }
     } catch (e) {
-      setBackendOnline(false);
       if (e.name === 'AbortError') {
-        console.warn('Batch quotes timed out, maintaining existing stock cache');
+        console.warn('Batch quotes request timed out, preserving current cached prices');
       } else {
         console.error('Failed to load batch quotes', e);
+        fetch('/api/health')
+          .then(r => setBackendOnline(r.ok))
+          .catch(() => setBackendOnline(false));
       }
     } finally {
       setIsRefreshing(false);

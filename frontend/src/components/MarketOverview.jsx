@@ -345,7 +345,7 @@ export default function MarketOverview({
                     style={{ padding: '8px 8px', textAlign: 'right', cursor: 'pointer' }}
                   >
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
-                      MARKET PRICE (₹) {renderSortIndicator('price')}
+                      <span className="desktop-only-inline">MARKET </span>PRICE (₹) {renderSortIndicator('price')}
                     </div>
                   </th>
                   <th 

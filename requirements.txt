@@ -3,3 +3,4 @@ flask-cors>=4.0
 gunicorn>=21.0
 yfinance>=0.2.30
 pandas>=2.0
+numpy>=1.24

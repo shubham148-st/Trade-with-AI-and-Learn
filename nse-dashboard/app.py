@@ -25,6 +25,7 @@ _QUOTES_CACHE = {
     "data": []
 }
 _HISTORY_CACHE = {}  # key: (symbol, period, interval) -> { "timestamp": float, "payload": dict }
+_SINGLE_QUOTE_CACHE = {}  # key: symbol -> { "timestamp": float, "payload": dict }
 
 class CircuitBreaker:
     """Thread-safe circuit breaker preventing cascading failures to yfinance."""
@@ -182,37 +183,80 @@ def api_health():
 
 @app.route("/api/quote/<symbol>")
 def get_quote(symbol):
-    """Get real-time quote for a single stock."""
+    """Get real-time quote for a single stock using blazing-fast fast_info and 20s TTL cache."""
+    now = time.time()
+    if symbol in _SINGLE_QUOTE_CACHE and (now - _SINGLE_QUOTE_CACHE[symbol]["timestamp"] < 20):
+        return jsonify(_SINGLE_QUOTE_CACHE[symbol]["payload"])
+
+    # Fallback to batch quote cache if available
+    cached_batch = {item["symbol"]: item for item in _QUOTES_CACHE.get("data", []) if isinstance(item, dict) and "symbol" in item}
+    existing = cached_batch.get(symbol, {})
+
     try:
         ticker = yf.Ticker(symbol)
-        info = ticker.info
-        hist_1d = ticker.history(period="1d", interval="1m")
+        fi = getattr(ticker, "fast_info", None)
+        
+        price = _safe_float(getattr(fi, "last_price", None)) if fi else existing.get("price")
+        prev_close = _safe_float(getattr(fi, "previous_close", None)) if fi else None
+        open_price = _safe_float(getattr(fi, "open", None)) if fi else None
+        day_high = _safe_float(getattr(fi, "day_high", None)) if fi else None
+        day_low = _safe_float(getattr(fi, "day_low", None)) if fi else None
+        volume = getattr(fi, "last_volume", None) if fi else None
+        mcap = getattr(fi, "market_cap", None) if fi else None
+        w52h = _safe_float(getattr(fi, "year_high", None)) if fi else None
+        w52l = _safe_float(getattr(fi, "year_low", None)) if fi else None
 
-        # Build intraday sparkline data
+        # Build quick sparkline without slow full-day resolution
         sparkline = []
-        if not hist_1d.empty:
-            for ts, row in hist_1d.iterrows():
-                sparkline.append({
-                    "time": ts.strftime("%H:%M"),
-                    "price": _safe_float(row["Close"]),
-                })
+        try:
+            hist_1d = ticker.history(period="1d", interval="5m")
+            if not hist_1d.empty:
+                for ts, row in hist_1d.iterrows():
+                    c_val = _safe_float(row.get("Close"))
+                    if c_val:
+                        sparkline.append({
+                            "time": ts.strftime("%H:%M"),
+                            "price": c_val,
+                        })
+        except Exception:
+            pass
 
-        return jsonify({
+        payload = {
             "symbol": symbol,
-            "name": NSE_STOCKS.get(symbol, info.get("shortName", symbol)),
-            "price": _safe_float(info.get("currentPrice") or info.get("regularMarketPrice")),
-            "previousClose": _safe_float(info.get("previousClose") or info.get("regularMarketPreviousClose")),
-            "open": _safe_float(info.get("open") or info.get("regularMarketOpen")),
-            "dayHigh": _safe_float(info.get("dayHigh") or info.get("regularMarketDayHigh")),
-            "dayLow": _safe_float(info.get("dayLow") or info.get("regularMarketDayLow")),
-            "volume": info.get("volume") or info.get("regularMarketVolume"),
-            "marketCap": info.get("marketCap"),
-            "fiftyTwoWeekHigh": _safe_float(info.get("fiftyTwoWeekHigh")),
-            "fiftyTwoWeekLow": _safe_float(info.get("fiftyTwoWeekLow")),
-            "pe": _safe_float(info.get("trailingPE")),
+            "name": NSE_STOCKS.get(symbol, symbol),
+            "price": price or existing.get("price"),
+            "previousClose": prev_close,
+            "open": open_price,
+            "dayHigh": day_high,
+            "dayLow": day_low,
+            "volume": volume,
+            "marketCap": mcap,
+            "fiftyTwoWeekHigh": w52h,
+            "fiftyTwoWeekLow": w52l,
+            "pe": None,
             "sparkline": sparkline,
-        })
+        }
+        _SINGLE_QUOTE_CACHE[symbol] = {"timestamp": now, "payload": payload}
+        return jsonify(payload)
     except Exception as e:
+        if symbol in _SINGLE_QUOTE_CACHE:
+            return jsonify(_SINGLE_QUOTE_CACHE[symbol]["payload"])
+        if existing and existing.get("price"):
+            return jsonify({
+                "symbol": symbol,
+                "name": NSE_STOCKS.get(symbol, symbol),
+                "price": existing.get("price"),
+                "previousClose": existing.get("price"),
+                "open": existing.get("price"),
+                "dayHigh": existing.get("price"),
+                "dayLow": existing.get("price"),
+                "volume": 0,
+                "marketCap": 0,
+                "fiftyTwoWeekHigh": existing.get("price"),
+                "fiftyTwoWeekLow": existing.get("price"),
+                "pe": None,
+                "sparkline": [],
+            })
         return jsonify({"error": str(e)}), 500
 
 

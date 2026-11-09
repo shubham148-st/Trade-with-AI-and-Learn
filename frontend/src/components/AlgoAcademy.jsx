@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Activity, 
   TrendingUp, 
@@ -18,8 +18,6 @@ import {
   BookOpen,
   Sliders,
   X,
-  ChevronDown,
-  Sparkles,
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
@@ -36,7 +34,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
   const [observedData, setObservedData] = useState({ stats: {}, available_patterns: [], timeline: [], signals: [] });
   const [isLoadingObserved, setIsLoadingObserved] = useState(false);
 
-  // Floating Overlay states (non-layout-displacing hovering modal)
+  // Floating Overlay states (non-displacing hovering modal)
   const [hoveredStrategy, setHoveredStrategy] = useState(null); // Left Row overlay (Textbook)
   const [hoveredInstance, setHoveredInstance] = useState(null); // Right Row overlay (Real Pattern)
   const [isOverlayPinned, setIsOverlayPinned] = useState(false);
@@ -123,6 +121,11 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
 
   const signalsList = Array.isArray(observedData?.signals) ? observedData.signals : [];
   const patternChoices = Array.isArray(observedData?.available_patterns) ? observedData.available_patterns : [];
+  const sessionInfo = observedData.stats?.market_session || {
+    is_closed: true,
+    session_badge: "Market Closed • Patterns Captured",
+    data_source: "EOD Finalized"
+  };
 
   // ── LEFT ROW OVERLAY: Synthetic Textbook Setup Chart ──
   const renderTextbookChart = (algo) => {
@@ -171,7 +174,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
             <span>{title}</span>
           </div>
           <span style={{ fontSize: '0.65rem', background: 'rgba(0, 212, 170, 0.1)', color: 'var(--accent, #00d4aa)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-            Annotated Textbook Setup
+            Textbook Framework
           </span>
         </div>
 
@@ -284,7 +287,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
       <div style={{ background: '#101218', borderRadius: '8px', border: '1px solid var(--border, #2a2d35)', padding: '10px 12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
           <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: 'var(--accent, #00d4aa)' }}>● REAL MARKET PATTERN EXECUTION</span>
+            <span style={{ color: 'var(--accent, #00d4aa)' }}>● REAL NSE HISTORICAL CANDLES</span>
             <span style={{ color: 'var(--text-muted, #888888)', fontFamily: 'monospace' }}>({clean_symbol})</span>
           </div>
           <span style={{
@@ -387,40 +390,40 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
 
     const counts = timeline.map(t => Number(t.count) || 1);
     const maxCount = Math.max(...counts, 1);
-    const height = 70;
+    const height = 65;
 
     return (
-      <div style={{ background: '#12141a', borderRadius: '8px', border: '1px solid var(--border, #2a2d35)', padding: '10px 14px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #888888)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div style={{ background: '#12141a', borderRadius: '8px', border: '1px solid var(--border, #2a2d35)', padding: '8px 12px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #888888)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Activity size={12} color="var(--accent, #00d4aa)" />
-            <span>Detection Distribution ({timeframe})</span>
+            <span>Signal Frequency Distribution ({timeframe})</span>
           </div>
           <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--green, #2ed573)' }}>
             {observedData.stats?.win_rate ?? 72.4}% Win Rate
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: `${height}px`, gap: '6px', paddingTop: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: `${height}px`, gap: '6px', paddingTop: '6px' }}>
           {timeline.map((item, idx) => {
             const c = Number(item.count) || 0;
-            const barHeight = Math.max(8, (c / maxCount) * (height - 22));
+            const barHeight = Math.max(8, (c / maxCount) * (height - 20));
             return (
               <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: '0.64rem', fontWeight: 800, color: 'var(--accent, #00d4aa)', marginBottom: '2px', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--accent, #00d4aa)', marginBottom: '2px', fontFamily: 'monospace' }}>
                   {c}
                 </span>
                 <div 
                   style={{ 
                     width: '100%', 
-                    maxWidth: '32px', 
+                    maxWidth: '30px', 
                     height: `${barHeight}px`, 
                     background: 'linear-gradient(180deg, var(--accent, #00d4aa) 0%, rgba(0, 212, 170, 0.3) 100%)',
                     borderRadius: '4px 4px 1px 1px',
                     transition: 'height 0.3s ease'
                   }} 
                 />
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted, #888888)', marginTop: '3px', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '0.64rem', color: 'var(--text-muted, #888888)', marginTop: '2px', whiteSpace: 'nowrap' }}>
                   {item.label}
                 </span>
               </div>
@@ -431,162 +434,135 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
     );
   };
 
+  // ── Strategy Specification Overlay (Mounted on Right Column) ──
+  const renderStrategyOverlay = () => {
+    if (!hoveredStrategy) return null;
+    return (
+      <div className="algo-column-overlay hide-scrollbar">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {renderIcon(hoveredStrategy.icon_name, 18, 'var(--accent, #00d4aa)')}
+            <div>
+              <div style={{ fontSize: '0.64rem', color: 'var(--accent, #00d4aa)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                TEXTBOOK SPECIFICATION & RULES
+              </div>
+              <h3 style={{ fontSize: '1.02rem', fontWeight: 800, color: '#ffffff', marginTop: '1px' }}>
+                {hoveredStrategy.name}
+              </h3>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.68rem', background: 'rgba(0, 212, 170, 0.12)', color: 'var(--accent, #00d4aa)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+              {hoveredStrategy.category}
+            </span>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setHoveredStrategy(null); setIsOverlayPinned(false); }}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border, #2a2d35)', borderRadius: '6px', color: 'var(--text-muted, #888888)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="Close Preview"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-main, #d1d5db)', lineHeight: 1.45, margin: 0, flexShrink: 0 }}>
+          {hoveredStrategy.summary}
+        </p>
+
+        {/* SVG Textbook Chart */}
+        <div style={{ flexShrink: 0 }}>
+          {renderTextbookChart(hoveredStrategy)}
+        </div>
+
+        {/* 3 Strict Rules */}
+        <div className="algo-modal-rules-grid" style={{ flexShrink: 0 }}>
+          <div style={{ background: 'rgba(46, 213, 115, 0.08)', border: '1px solid rgba(46, 213, 115, 0.25)', borderRadius: '6px', padding: '6px 8px' }}>
+            <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--green, #2ed573)' }}>ENTRY TRIGGER</div>
+            <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{hoveredStrategy.entry_rule}</div>
+          </div>
+          <div style={{ background: 'rgba(255, 71, 87, 0.08)', border: '1px solid rgba(255, 71, 87, 0.25)', borderRadius: '6px', padding: '6px 8px' }}>
+            <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--red, #ff4757)' }}>STOP LOSS</div>
+            <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{hoveredStrategy.stop_loss_rule}</div>
+          </div>
+          <div style={{ background: 'rgba(0, 212, 170, 0.08)', border: '1px solid rgba(0, 212, 170, 0.25)', borderRadius: '6px', padding: '6px 8px' }}>
+            <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--accent, #00d4aa)' }}>TARGET EXIT</div>
+            <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{hoveredStrategy.target_rule}</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Real Execution Pattern Overlay (Mounted on Left Column) ──
+  const renderInstanceOverlay = () => {
+    if (!hoveredInstance) return null;
+    return (
+      <div className="algo-column-overlay hide-scrollbar">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#ffffff', background: 'rgba(255,255,255,0.08)', padding: '3px 8px', borderRadius: '4px', fontFamily: 'monospace' }}>
+              {hoveredInstance.stock_clean || hoveredInstance.symbol}
+            </span>
+            <div>
+              <div style={{ fontSize: '0.64rem', color: 'var(--accent, #00d4aa)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                REAL MARKET EXECUTION RECORD
+              </div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', marginTop: '1px' }}>
+                {hoveredInstance.algo_name}
+              </h3>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>
+              {hoveredInstance.timestamp}
+            </span>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setHoveredInstance(null); setIsOverlayPinned(false); }}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border, #2a2d35)', borderRadius: '6px', color: 'var(--text-muted, #888888)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="Close Preview"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* SVG Real Pattern Chart */}
+        <div style={{ flexShrink: 0 }}>
+          {renderRealPatternChart(hoveredInstance.real_chart)}
+        </div>
+
+        {/* Instance Execution Metrics */}
+        <div className="algo-modal-metrics-grid" style={{ flexShrink: 0 }}>
+          <div>
+            <span style={{ color: 'var(--text-muted, #888888)' }}>Trigger Price: </span>
+            <strong style={{ color: '#ffffff', fontFamily: 'monospace' }}>₹{hoveredInstance.price}</strong>
+          </div>
+          <div>
+            <span style={{ color: 'var(--text-muted, #888888)' }}>Outcome: </span>
+            <strong style={{ color: hoveredInstance.status === 'Target Hit' ? 'var(--green, #2ed573)' : (hoveredInstance.status === 'Stopped Out' ? 'var(--red, #ff4757)' : 'var(--accent, #00d4aa)') }}>
+              {hoveredInstance.status}
+            </strong>
+          </div>
+          <div>
+            <span style={{ color: 'var(--text-muted, #888888)' }}>P&L Return: </span>
+            <strong style={{ color: hoveredInstance.return_pct > 0 ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)', fontFamily: 'monospace' }}>
+              {hoveredInstance.return_pct > 0 ? '+' : ''}{hoveredInstance.return_pct}%
+            </strong>
+          </div>
+          <div>
+            <span style={{ color: 'var(--text-muted, #888888)' }}>Confidence: </span>
+            <strong style={{ color: 'var(--accent, #00d4aa)' }}>{hoveredInstance.confidence}%</strong>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', position: 'relative' }}>
       
-      {/* ── FLOATING HOVER OVERLAY: Left Row Textbook Example Preview ── */}
-      {hoveredStrategy && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 3000,
-            width: '560px',
-            maxWidth: '92vw',
-            background: 'rgba(18, 20, 26, 0.96)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid var(--accent, #00d4aa)',
-            borderRadius: '12px',
-            padding: '1.25rem',
-            boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.85rem'
-          }}
-          onMouseEnter={() => !isOverlayPinned && setHoveredStrategy(hoveredStrategy)}
-          onMouseLeave={() => !isOverlayPinned && setHoveredStrategy(null)}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {renderIcon(hoveredStrategy.icon_name, 18, 'var(--accent, #00d4aa)')}
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>{hoveredStrategy.name}</h3>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.68rem', background: 'rgba(0, 212, 170, 0.12)', color: 'var(--accent, #00d4aa)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                {hoveredStrategy.category}
-              </span>
-              <button 
-                onClick={() => { setHoveredStrategy(null); setIsOverlayPinned(false); }}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted, #888888)', cursor: 'pointer', padding: '2px' }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-main, #d1d5db)', lineHeight: 1.45 }}>
-            {hoveredStrategy.summary}
-          </p>
-
-          {/* SVG Textbook Chart */}
-          {renderTextbookChart(hoveredStrategy)}
-
-          {/* 3 Strict Rules */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginTop: '2px' }}>
-            <div style={{ background: 'rgba(46, 213, 115, 0.08)', border: '1px solid rgba(46, 213, 115, 0.25)', borderRadius: '6px', padding: '6px 8px' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--green, #2ed573)' }}>ENTRY TRIGGER</div>
-              <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{hoveredStrategy.entry_rule}</div>
-            </div>
-            <div style={{ background: 'rgba(255, 71, 87, 0.08)', border: '1px solid rgba(255, 71, 87, 0.25)', borderRadius: '6px', padding: '6px 8px' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--red, #ff4757)' }}>STOP LOSS</div>
-              <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{hoveredStrategy.stop_loss_rule}</div>
-            </div>
-            <div style={{ background: 'rgba(0, 212, 170, 0.08)', border: '1px solid rgba(0, 212, 170, 0.25)', borderRadius: '6px', padding: '6px 8px' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--accent, #00d4aa)' }}>TARGET EXIT</div>
-              <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{hoveredStrategy.target_rule}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── FLOATING HOVER OVERLAY: Right Row Real Pattern Execution Preview ── */}
-      {hoveredInstance && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 3000,
-            width: '560px',
-            maxWidth: '92vw',
-            background: 'rgba(18, 20, 26, 0.96)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid var(--accent, #00d4aa)',
-            borderRadius: '12px',
-            padding: '1.25rem',
-            boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.85rem'
-          }}
-          onMouseEnter={() => !isOverlayPinned && setHoveredInstance(hoveredInstance)}
-          onMouseLeave={() => !isOverlayPinned && setHoveredInstance(null)}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#ffffff', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '4px', fontFamily: 'monospace' }}>
-                {hoveredInstance.stock_clean}
-              </span>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff' }}>{hoveredInstance.algo_name}</h3>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>
-                {hoveredInstance.timestamp}
-              </span>
-              <button 
-                onClick={() => { setHoveredInstance(null); setIsOverlayPinned(false); }}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted, #888888)', cursor: 'pointer', padding: '2px' }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* SVG Real Pattern Chart */}
-          {renderRealPatternChart(hoveredInstance.real_chart)}
-
-          {/* Instance Execution Metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', background: '#12141a', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border, #2a2d35)', fontSize: '0.72rem' }}>
-            <div>
-              <span style={{ color: 'var(--text-muted, #888888)' }}>Trigger Price: </span>
-              <strong style={{ color: '#ffffff', fontFamily: 'monospace' }}>₹{hoveredInstance.price}</strong>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted, #888888)' }}>Outcome: </span>
-              <strong style={{ color: hoveredInstance.status === 'Target Hit' ? 'var(--green, #2ed573)' : (hoveredInstance.status === 'Stopped Out' ? 'var(--red, #ff4757)' : 'var(--accent, #00d4aa)') }}>
-                {hoveredInstance.status}
-              </strong>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted, #888888)' }}>P&L Return: </span>
-              <strong style={{ color: hoveredInstance.return_pct > 0 ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)', fontFamily: 'monospace' }}>
-                {hoveredInstance.return_pct > 0 ? '+' : ''}{hoveredInstance.return_pct}%
-              </strong>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted, #888888)' }}>Confidence: </span>
-              <strong style={{ color: 'var(--accent, #00d4aa)' }}>{hoveredInstance.confidence}%</strong>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 1. Header Bar matching MarketOverview styling */}
-      <div style={{
-        background: 'linear-gradient(135deg, var(--bg-card, #1a1d23) 0%, #161820 100%)',
-        border: '1px solid var(--border, #2a2d35)',
-        borderRadius: '12px',
-        padding: '1.25rem 1.5rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)'
-      }}>
+      <div className="algo-header-hero">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent, #00d4aa)', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '4px' }}>
             <BookOpen size={15} />
@@ -601,50 +577,40 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
         </div>
 
         {/* Quick Header Metric Badges */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{ background: 'var(--bg-secondary, #14171d)', border: '1px solid var(--border, #2a2d35)', borderRadius: '8px', padding: '6px 12px', textAlign: 'center' }}>
+        <div className="algo-header-badges">
+          <div className="algo-header-badge-item">
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>Catalog Strategies</div>
             <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>{safeAlgos.length}</div>
           </div>
-          <div style={{ background: 'var(--bg-secondary, #14171d)', border: '1px solid var(--border, #2a2d35)', borderRadius: '8px', padding: '6px 12px', textAlign: 'center' }}>
+          <div className="algo-header-badge-item">
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>Recorded Instances</div>
             <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent, #00d4aa)' }}>{signalsList.length}</div>
           </div>
-          <div style={{ background: 'var(--bg-secondary, #14171d)', border: '1px solid var(--border, #2a2d35)', borderRadius: '8px', padding: '6px 12px', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>Historical Win Rate</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--green, #2ed573)' }}>{observedData.stats?.win_rate ?? 72.4}%</div>
+          <div className="algo-header-badge-item">
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>Session Status</div>
+            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: sessionInfo.is_closed ? 'var(--accent, #00d4aa)' : 'var(--amber, #ffa502)', marginTop: '4px' }}>
+              {sessionInfo.is_closed ? '● EOD Captured' : '● Live In Session'}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 2. Main Symmetrical 2-Column Split Screen Layout (50% / 50%) */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-        gap: '1.25rem',
-        alignItems: 'stretch'
-      }} className="algo-grid-container">
+      {/* 2. Main Symmetrical 2-Column Split Screen Layout (Exact 50% / 50% with Responsive Heights) */}
+      <div className="algo-grid-container">
 
-        {/* ── LEFT ROW: Strategy Encyclopedia & Library ── */}
-        <div style={{
-          background: 'var(--bg-card, #1a1d23)',
-          border: '1px solid var(--border, #2a2d35)',
-          borderRadius: '12px',
-          padding: '1.25rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
-        }}>
+        {/* ── LEFT ROW: Strategy Encyclopedia & Library (Responsive Card) ── */}
+        <div className="algo-column-card">
+          {/* Real Pattern Execution Overlay (Triggered by hovering Right Row trades) */}
+          {hoveredInstance && renderInstanceOverlay()}
           {/* Header & Search */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sliders size={16} color="var(--accent, #00d4aa)" />
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>
                 Strategy Library ({filteredAlgos.length})
               </h3>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-secondary, #14171d)', border: '1px solid var(--border, #2a2d35)', borderRadius: '6px', padding: '4px 8px', width: '200px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-secondary, #14171d)', border: '1px solid var(--border, #2a2d35)', borderRadius: '6px', padding: '4px 8px', flex: '1 1 auto', minWidth: '130px', maxWidth: '220px' }}>
               <Search size={13} color="var(--text-muted, #888888)" />
               <input 
                 type="text" 
@@ -657,7 +623,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
           </div>
 
           {/* Category Filter Pills */}
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }} className="hide-scrollbar">
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '8px 0', flexShrink: 0 }} className="hide-scrollbar">
             {categories.map(cat => {
               const isActive = filterCategory === cat;
               return (
@@ -682,26 +648,35 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
             })}
           </div>
 
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #888888)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Eye size={12} color="var(--accent, #00d4aa)" />
-            <span>Hover any strategy to preview textbook setup chart & execution rules.</span>
-          </div>
-
           {/* Strategy Cards List */}
           <div 
-            className="hide-scrollbar" 
-            style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '680px', overflowY: 'auto' }}
+            className="algo-scroll-list hide-scrollbar"
+            onMouseLeave={() => {
+              if (!isOverlayPinned) {
+                setHoveredStrategy(null);
+              }
+            }}
           >
             {filteredAlgos.map(algo => {
               const isHovered = hoveredStrategy?.id === algo.id;
               return (
                 <div
                   key={algo.id}
-                  onMouseEnter={() => setHoveredStrategy(algo)}
-                  onMouseLeave={() => !isOverlayPinned && setHoveredStrategy(null)}
+                  onMouseEnter={() => {
+                    if (!isOverlayPinned) {
+                      setHoveredStrategy(algo);
+                      setHoveredInstance(null);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (!isOverlayPinned) {
+                      setHoveredStrategy(null);
+                    }
+                  }}
                   onClick={() => {
                     setHoveredStrategy(algo);
-                    setIsOverlayPinned(true);
+                    setHoveredInstance(null);
+                    setIsOverlayPinned(prev => !prev || hoveredStrategy?.id !== algo.id);
                   }}
                   style={{
                     background: isHovered ? 'rgba(0, 212, 170, 0.08)' : 'var(--bg-secondary, #14171d)',
@@ -710,7 +685,8 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                     padding: '11px 14px',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
-                    boxShadow: isHovered ? '0 0 12px rgba(0, 212, 170, 0.15)' : 'none'
+                    boxShadow: isHovered ? '0 0 12px rgba(0, 212, 170, 0.15)' : 'none',
+                    flexShrink: 0
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -758,27 +734,20 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
           </div>
         </div>
 
-        {/* ── RIGHT ROW: Recorded Algorithmic Instances & Real Graph Execution ── */}
-        <div style={{
-          background: 'var(--bg-card, #1a1d23)',
-          border: '1px solid var(--border, #2a2d35)',
-          borderRadius: '12px',
-          padding: '1.25rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
-        }}>
-          {/* Header & Controls: 1D | 1W | 1M | ALL + Pattern Choice */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={16} color="var(--accent, #00d4aa)" />
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>
-                Recorded Instances ({signalsList.length})
-              </h3>
-            </div>
+        {/* ── RIGHT ROW: Recorded Algorithmic Instances & Real Graph Execution (Responsive Card) ── */}
+        <div className="algo-column-card">
+          {/* Strategy Specification Overlay (Triggered by hovering Left Row strategies) */}
+          {hoveredStrategy && renderStrategyOverlay()}
+          {/* Header & Controls: 1D | 1W | 1M | ALL + Pattern Choice (Responsive Group) */}
+          <div className="algo-control-group" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', flexShrink: 0 }}>
+            <div className="algo-control-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Activity size={16} color="var(--accent, #00d4aa)" />
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>
+                  Recorded Instances ({signalsList.length})
+                </h3>
+              </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               {/* Pattern Choice Dropdown */}
               <select
                 value={selectedPattern}
@@ -792,7 +761,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                   padding: '4px 8px',
                   outline: 'none',
                   cursor: 'pointer',
-                  maxWidth: '150px'
+                  maxWidth: '145px'
                 }}
               >
                 <option value="ALL">All Patterns</option>
@@ -800,9 +769,10 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                   <option key={pat} value={pat}>{pat}</option>
                 ))}
               </select>
+            </div>
 
-              {/* Timeframe Filter Buttons: 1D | 1W | 1M | ALL with Smooth Sliding Indicator */}
-              <div className="sliding-seg-container">
+            {/* Timeframe Filter Buttons: 1D | 1W | 1M | ALL */}
+            <div className="sliding-seg-container">
                 <div
                   style={{
                     position: 'absolute',
@@ -833,26 +803,19 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                 ))}
               </div>
             </div>
-          </div>
 
           {/* Instances Activity Distribution Graph */}
-          {renderInstanceGraph()}
-
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #888888)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Eye size={12} color="var(--accent, #00d4aa)" />
-            <span>Hover any recorded trade to inspect real market candlestick execution graph.</span>
+          <div style={{ margin: '8px 0', flexShrink: 0 }}>
+            {renderInstanceGraph()}
           </div>
 
-          {/* Table of Recorded Instances (Ensuring Row #1 is prominently visible) */}
+          {/* Table of Recorded Instances */}
           <div 
-            className="hide-scrollbar" 
-            style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '8px', 
-              maxHeight: '520px', 
-              overflowY: 'auto',
-              paddingTop: '4px' // Ensures first row is NEVER clipped or hidden
+            className="algo-scroll-list hide-scrollbar"
+            onMouseLeave={() => {
+              if (!isOverlayPinned) {
+                setHoveredInstance(null);
+              }
             }}
           >
             {isLoadingObserved ? (
@@ -876,50 +839,62 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                 return (
                   <div
                     key={sig.id || idx}
-                    onMouseEnter={() => setHoveredInstance(sig)}
-                    onMouseLeave={() => !isOverlayPinned && setHoveredInstance(null)}
+                    onMouseEnter={() => {
+                      if (!isOverlayPinned) {
+                        setHoveredInstance(sig);
+                        setHoveredStrategy(null);
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      if (!isOverlayPinned) {
+                        setHoveredInstance(null);
+                      }
+                    }}
                     onClick={() => {
                       setHoveredInstance(sig);
-                      setIsOverlayPinned(true);
+                      setHoveredStrategy(null);
+                      setIsOverlayPinned(prev => !prev || hoveredInstance?.id !== sig.id);
                     }}
                     style={{
                       background: isHovered ? 'rgba(0, 212, 170, 0.08)' : 'var(--bg-secondary, #14171d)',
-                      border: '1px solid ' + (isHovered ? 'var(--accent, #00d4aa)' : (idx === 0 ? 'rgba(255, 255, 255, 0.12)' : 'var(--border, #2a2d35)')),
+                      border: '1px solid ' + (isHovered ? 'var(--accent, #00d4aa)' : (idx === 0 ? 'rgba(255, 255, 255, 0.14)' : 'var(--border, #2a2d35)')),
                       borderRadius: '8px',
                       padding: '11px 14px',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
-                      boxShadow: isHovered ? '0 0 12px rgba(0, 212, 170, 0.15)' : 'none'
+                      boxShadow: isHovered ? '0 0 12px rgba(0, 212, 170, 0.15)' : 'none',
+                      flexShrink: 0
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
-                        <span style={{
-                          fontWeight: 800,
-                          fontSize: '0.86rem',
-                          color: '#ffffff',
-                          background: 'rgba(255, 255, 255, 0.06)',
-                          padding: '3px 7px',
-                          borderRadius: '4px',
-                          fontFamily: 'monospace',
-                          border: '1px solid rgba(255,255,255,0.08)'
-                        }}>
-                          {sig.stock_clean || sig.symbol || 'NIFTY'}
-                        </span>
-                        <div>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isHovered ? '#ffffff' : 'var(--text-main, #d1d5db)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+                      {/* Line 1: Stock symbol, Strategy name, and Status Pill */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                          <span style={{
+                            fontWeight: 800,
+                            fontSize: '0.8rem',
+                            color: '#ffffff',
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            fontFamily: 'monospace',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            flexShrink: 0
+                          }}>
+                            {sig.stock_clean || sig.symbol || 'NIFTY'}
+                          </span>
+                          <span style={{ 
+                            fontSize: '0.84rem', 
+                            fontWeight: 700, 
+                            color: isHovered ? '#ffffff' : 'var(--text-main, #d1d5db)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
                             {sig.algo_name || 'Pattern Trigger'}
-                          </div>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '1px' }}>
-                            <Clock size={11} />
-                            <span>{sig.timestamp}</span>
-                            <span>•</span>
-                            <span>Trigger: ₹{sigPrice.toLocaleString('en-IN', { minimumFractionDigits: 1 })}</span>
-                          </div>
+                          </span>
                         </div>
-                      </div>
 
-                      <div style={{ textAlign: 'right' }}>
                         <span style={{
                           fontSize: '0.68rem',
                           fontWeight: 700,
@@ -927,11 +902,23 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                           color: statusColor,
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          display: 'inline-block'
+                          flexShrink: 0,
+                          whiteSpace: 'nowrap'
                         }}>
                           {sig.status} ({returnPct > 0 ? '+' : ''}{returnPct}%)
                         </span>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted, #888888)', marginTop: '2px' }}>
+                      </div>
+
+                      {/* Line 2: Timestamp, Trigger Price, and Confidence Score */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <Clock size={11} />
+                          <span>{sig.timestamp}</span>
+                          <span>•</span>
+                          <span style={{ color: 'var(--text-main, #d1d5db)' }}>Trigger: <strong style={{ color: '#ffffff', fontFamily: 'monospace' }}>₹{sigPrice.toLocaleString('en-IN', { minimumFractionDigits: 1 })}</strong></span>
+                        </div>
+
+                        <div style={{ fontWeight: 600, color: 'var(--accent, #00d4aa)', flexShrink: 0 }}>
                           Score: {sig.confidence || 75}%
                         </div>
                       </div>

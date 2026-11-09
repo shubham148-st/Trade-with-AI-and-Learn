@@ -46,7 +46,7 @@ def run_automated_sim_cycle():
         # 1. Trigger scan
         log("Executing parallel discovery across 30+ NSE stocks (News NLP + Historical + Strategy)...", "SCAN")
         req = urllib.request.Request(f"{BACKEND_URL}/api/analysis/scan")
-        with urllib.request.urlopen(req, timeout=40) as response:
+        with urllib.request.urlopen(req, timeout=80) as response:
             ranked = json.loads(response.read().decode())
         
         top_candidates = ranked[:3]
@@ -105,15 +105,17 @@ def main():
     print("  * Paper Trading: 10 Lakh Virtual Capital + Auto Risk Guardrails")
     print("=======================================================================")
 
+    flask_proc = None
+    app_py = os.path.join(BACKEND_DIR, "app.py")
+    venv_py = os.path.join(BASE_DIR, ".venv", "Scripts", "python.exe")
+    py_bin = venv_py if os.path.exists(venv_py) else sys.executable
+
     # 1. Start Flask Backend (or reuse if active)
     backend_already_up = check_service_ready(f"{BACKEND_URL}/api/health", timeout=1)
     if backend_already_up:
         log("Flask Quant & Streaming Engine is already running on port 5500.", "OK")
     else:
         log("Starting Flask Quant & Streaming Engine on port 5500...", "INIT")
-        app_py = os.path.join(BACKEND_DIR, "app.py")
-        venv_py = os.path.join(BASE_DIR, ".venv", "Scripts", "python.exe")
-        py_bin = venv_py if os.path.exists(venv_py) else sys.executable
         flask_proc = subprocess.Popen(
             [py_bin, app_py],
             cwd=BACKEND_DIR
@@ -162,9 +164,33 @@ def main():
     print("  -> Press Ctrl + C anytime in this terminal to shut down all servers.")
     print("-----------------------------------------------------------------------")
 
+    watchdog_ticks = 0
+    consecutive_health_failures = 0
     try:
         while True:
-            time.sleep(1)
+            time.sleep(2)
+            watchdog_ticks += 1
+
+            # Background Watchdog: every 6 seconds, ensure Flask backend is responsive
+            if watchdog_ticks % 3 == 0:
+                is_healthy = check_service_ready(f"{BACKEND_URL}/api/health", timeout=2)
+                proc_dead = flask_proc is not None and flask_proc.poll() is not None
+
+                if not is_healthy or proc_dead:
+                    consecutive_health_failures += 1
+                    if consecutive_health_failures >= 2:
+                        log("Backend health check failed. Auto-recovering Flask engine on port 5500...", "WARN")
+                        if flask_proc and flask_proc.poll() is None:
+                            try:
+                                flask_proc.kill()
+                            except Exception:
+                                pass
+                        flask_proc = subprocess.Popen([py_bin, app_py], cwd=BACKEND_DIR)
+                        processes.append(flask_proc)
+                        consecutive_health_failures = 0
+                        time.sleep(2)
+                else:
+                    consecutive_health_failures = 0
     except KeyboardInterrupt:
         cleanup()
 

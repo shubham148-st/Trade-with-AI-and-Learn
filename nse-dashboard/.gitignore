@@ -4,4 +4,4 @@ __pycache__/
 *$py.class
 quotes_cache.json
 paper_state.json
-
+real_candles_cache.json
