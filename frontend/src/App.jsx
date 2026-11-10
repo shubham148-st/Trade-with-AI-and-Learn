@@ -34,6 +34,11 @@ export default function App() {
       return { tab: 'stock-detail', symbol: sym.endsWith('.NS') ? sym : `${sym}.NS` };
     }
     if (currentPath.toUpperCase().startsWith('AI/') || currentPath.toLowerCase().startsWith('ai/')) {
+      const sub = currentPath.slice(3).trim().toLowerCase();
+      // Supports /AI/pre, /AI/live, /AI/post or legacy /AI/SYMBOL
+      if (['pre', 'live', 'post'].includes(sub)) {
+        return { tab: 'ai-analysis', symbol: 'RELIANCE.NS', subMode: sub === 'pre' ? 'pre-market' : sub === 'live' ? 'live-trading' : 'post-market' };
+      }
       const sym = currentPath.slice(3).trim().toUpperCase();
       return { tab: 'ai-analysis', symbol: sym ? (sym.endsWith('.NS') ? sym : `${sym}.NS`) : 'RELIANCE.NS' };
     }
@@ -131,17 +136,10 @@ export default function App() {
     }
   };
 
-  // Handler: Select a stock for AI Screener -> Leads to /AI/SYMBOL
+  // Handler: Select a stock for AI Screener without hijacking path to /AI/SYMBOL
   const handleSelectStockForAI = (symbol) => {
     const formatted = symbol.includes('.NS') ? symbol : `${symbol}.NS`;
-    const clean = formatted.replace('.NS', '');
     setSelectedStockSymbol(formatted);
-    setActiveTab('ai-analysis');
-    try {
-      window.history.pushState({ symbol: formatted }, '', `/AI/${clean}`);
-    } catch {
-      window.location.hash = `#/AI/${clean}`;
-    }
   };
 
   // Handler: General Tab Navigation with clean URLs
@@ -153,7 +151,7 @@ export default function App() {
     } else if (tab === 'stock-detail') {
       try { window.history.pushState({}, '', `/stocks/${clean}`); } catch { window.location.hash = `#/stocks/${clean}`; }
     } else if (tab === 'ai-analysis') {
-      try { window.history.pushState({}, '', `/AI/${clean}`); } catch { window.location.hash = `#/AI/${clean}`; }
+      try { window.history.pushState({}, '', `/AI`); } catch { window.location.hash = `#/AI`; }
     } else {
       try { window.history.pushState({}, '', `/${tab}`); } catch { window.location.hash = `#/${tab}`; }
     }

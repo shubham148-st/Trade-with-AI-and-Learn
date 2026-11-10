@@ -465,10 +465,77 @@ button {
 }
 
 
-/* Desktop only inline elements */
-.desktop-only-inline {
-  display: inline;
+/* AI Command Center & Screener Responsive Styles */
+.ai-layout-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 1.25rem;
+  min-height: 680px;
+  align-items: start;
 }
+
+@media (max-width: 1080px) {
+  .ai-layout-grid {
+    grid-template-columns: 340px 1fr;
+    gap: 1rem;
+  }
+}
+
+/* On screens <= 920px, hide desktop right-hand box and unfold details inline directly beneath the selected stock */
+@media (max-width: 920px) {
+  .ai-layout-grid {
+    display: block !important;
+  }
+  .ai-desktop-detail-panel {
+    display: none !important;
+  }
+}
+
+.ai-candidate-row {
+  display: grid;
+  grid-template-columns: 18px 22px minmax(70px, 1fr) 48px 62px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  min-height: 44px;
+}
+
+.ai-candidate-row:hover {
+  background: var(--bg-card-hover) !important;
+}
+
+.ai-inline-accordion {
+  display: none;
+}
+
+@media (max-width: 920px) {
+  .ai-inline-accordion {
+    display: block;
+    margin: 8px 0 12px 0;
+    padding: 12px;
+    background: var(--bg-bar);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+}
+
+.ai-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .ai-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+}
+
 
 @media (max-width: 768px) {
   .desktop-only-inline {
