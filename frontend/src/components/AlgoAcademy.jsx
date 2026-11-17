@@ -544,7 +544,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
           <div>
             <span style={{ color: 'var(--text-muted, #888888)' }}>P&L Return: </span>
             <strong style={{ color: inst.return_pct > 0 ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)', fontFamily: 'monospace' }}>
-              {inst.return_pct > 0 ? '+' : ''}{inst.return_pct}%
+              {typeof inst.return_pct === 'number' ? `${inst.return_pct > 0 ? '+' : ''}${inst.return_pct}%` : 'Not backtested'}
             </strong>
           </div>
           <div>
