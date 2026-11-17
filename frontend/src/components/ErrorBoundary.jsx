@@ -36,9 +36,26 @@ export default class ErrorBoundary extends React.Component {
           <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
             Rendering Notice
           </h3>
-          <p style={{ fontSize: '0.85rem', color: '#d1d5db', maxWidth: '480px', lineHeight: 1.5, marginBottom: '1.25rem' }}>
+          <p style={{ fontSize: '0.85rem', color: '#d1d5db', maxWidth: '480px', lineHeight: 1.5, marginBottom: '0.75rem' }}>
             {this.state.error?.message || 'An unexpected rendering condition occurred. The interface recovered safely.'}
           </p>
+          {this.state.error?.stack && (
+            <pre style={{
+              fontSize: '0.72rem',
+              color: '#f87171',
+              background: 'rgba(0,0,0,0.5)',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              maxWidth: '600px',
+              width: '100%',
+              overflowX: 'auto',
+              textAlign: 'left',
+              marginBottom: '1.25rem',
+              maxHeight: '180px'
+            }}>
+              {this.state.error.stack}
+            </pre>
+          )}
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button
               onClick={() => this.setState({ hasError: false, error: null })}

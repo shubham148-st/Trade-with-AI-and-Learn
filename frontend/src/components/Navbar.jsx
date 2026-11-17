@@ -49,7 +49,7 @@ export default function Navbar({
 
   const tabs = [
     { id: 'dashboard', label: 'Market Overview', desc: 'Indices, liquid bluechips & movers', icon: Activity },
-    { id: 'ai-analysis', label: 'Multi-Agent Screener', desc: 'Pre-market discovery & agent signals', icon: Bot },
+    { id: 'ai-analysis', label: 'AI Command Center', desc: 'Pre-market, live signals & post-market analysis', icon: Bot },
     { id: 'paper-trading', label: 'Live Paper Trading', desc: 'Virtual portfolio & risk guardrails', icon: Wallet },
     { id: 'algo-academy', label: 'Algo Academy', desc: 'Quantitative strategies knowledge base', icon: BookOpen },
   ];
