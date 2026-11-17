@@ -7,3 +7,5 @@ __pycache__/
 node_modules/
 .venv/
 
+skills-lock.json
+AGENTS.md
