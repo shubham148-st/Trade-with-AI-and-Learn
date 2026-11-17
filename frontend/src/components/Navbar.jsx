@@ -12,6 +12,7 @@ import {
   X,
   ChevronRight
 } from 'lucide-react';
+import { preloadChunk } from '../utils/preloadChunks';
 
 export default function Navbar({ 
   activeTab, 
@@ -206,12 +207,15 @@ export default function Navbar({
               border: '1px solid var(--border, #2a2d35)',
               borderRadius: '6px',
               padding: '4px 8px',
-              width: '140px'
+              width: '140px',
+              minHeight: '36px',
+              boxSizing: 'border-box'
             }}>
               <Search size={13} color="var(--text-muted, #888888)" />
               <input
                 type="text"
-                placeholder="Find stock..."
+                placeholder="Find stock…"
+                aria-label="Find stock"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setSearchOpen(true)}
@@ -256,7 +260,10 @@ export default function Navbar({
                       alignItems: 'center',
                       fontSize: '0.8rem'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                    onMouseEnter={(e) => {
+                      preloadChunk('StockPage');
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                    }}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     <div>
@@ -299,6 +306,12 @@ export default function Navbar({
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
+              onMouseEnter={() => {
+                preloadChunk('StockPage');
+                preloadChunk('ai-analysis');
+                preloadChunk('paper-trading');
+                preloadChunk('algo-academy');
+              }}
               style={{
                 background: menuOpen ? 'var(--accent, #00d4aa)' : 'var(--bg-card, #1a1d23)',
                 border: '1px solid var(--border, #2a2d35)',
@@ -401,6 +414,7 @@ export default function Navbar({
                         transition: 'background 0.15s'
                       }}
                       onMouseEnter={(e) => {
+                        preloadChunk(tab.id);
                         if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
                       }}
                       onMouseLeave={(e) => {

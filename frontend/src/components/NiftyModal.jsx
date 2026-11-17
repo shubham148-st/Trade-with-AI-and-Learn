@@ -552,6 +552,7 @@ export default function NiftyModal({ symbol = '^NSEI', title = 'NIFTY 50 Benchma
             </button>
             <button
               onClick={onClose}
+              aria-label="Close modal dialog"
               style={{
                 background: 'transparent',
                 border: 'none',
