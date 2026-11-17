@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg-primary: #0f1117;
   --bg-body: #0f1117;
   --bg-card: #1a1d23;
@@ -17,6 +18,29 @@
   --text-main: #d1d5db;
   --text-muted: #888888;
   --text-sub: #6b7280;
+}
+
+html {
+  color-scheme: dark;
+  touch-action: manipulation;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 * {
@@ -574,3 +598,175 @@ button {
     font-size: 0.7rem !important;
   }
 }
+
+/* ── Paper Trading Institutional Styles ────────────────────────────────── */
+.paper-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1024px) {
+  .paper-kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .paper-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+}
+
+.paper-layout-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .paper-layout-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.paper-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.paper-modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+
+.paper-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.paper-badge-source {
+  background: rgba(0, 212, 170, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(0, 212, 170, 0.25);
+}
+
+.paper-badge-divergence {
+  background: rgba(255, 165, 2, 0.15);
+  color: var(--amber);
+  border: 1px solid rgba(255, 165, 2, 0.35);
+}
+
+.paper-badge-manual {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* ── Paper Trading Header & Timeline Slider ───────────────────────────── */
+.paper-gear-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+  z-index: 200;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.paper-gear-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: var(--text-main);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.paper-gear-item:hover {
+  background: var(--bg-bar);
+  color: #fff;
+}
+
+.paper-gear-item.danger {
+  color: var(--red);
+}
+
+.paper-gear-item.danger:hover {
+  background: rgba(255, 71, 87, 0.12);
+}
+
+.sim-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.sim-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 212, 170, 0.6);
+  border: 2px solid #0f1117;
+  transition: transform 0.1s ease;
+}
+
+.sim-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+.sim-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 212, 170, 0.6);
+  border: 2px solid #0f1117;
+}
+
+
