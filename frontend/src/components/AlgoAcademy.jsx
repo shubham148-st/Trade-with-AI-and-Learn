@@ -549,7 +549,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
           </div>
           <div>
             <span style={{ color: 'var(--text-muted, #888888)' }}>Confidence: </span>
-            <strong style={{ color: 'var(--accent, #00d4aa)' }}>{inst.confidence}%</strong>
+            <strong style={{ color: 'var(--accent, #00d4aa)' }}>{typeof inst.confidence === 'number' ? `${inst.confidence}%` : 'Not scored'}</strong>
           </div>
         </div>
       </div>
