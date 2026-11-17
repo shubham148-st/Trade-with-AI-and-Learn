@@ -681,144 +681,88 @@ def get_observed_feed(filter_type="1D", pattern_id="ALL"):
 
 
 def detect_algo_patterns(chart_data):
-    """
-    Scans candlestick history for real candlestick & technical formations:
-    - Hammer & Inverted Hammer
-    - Bullish Engulfing
-    - Bearish Engulfing
-    - EMA Golden Cross (EMA 9 crossing above EMA 21)
-    - EMA Death Cross (EMA 9 crossing below EMA 21)
-    - VWAP Pullback / Defense
-    - 15-Minute / Daily Opening Range Breakout (ORB)
-    """
-    if not chart_data or len(chart_data) < 5:
+    """Detect confirmed formations from chronological, real OHLCV bars."""
+    if not isinstance(chart_data, list) or len(chart_data) < 5:
         return []
 
     detected = []
-    n = len(chart_data)
-
-    for i in range(1, n):
-        cur = chart_data[i]
-        prev = chart_data[i - 1]
-
-        o = cur.get("open")
-        h = cur.get("high")
-        l = cur.get("low")
-        c = cur.get("close")
-        d = cur.get("date")
-
-        if o is None or h is None or l is None or c is None:
+    for i in range(1, len(chart_data)):
+        cur, prev = chart_data[i], chart_data[i - 1]
+        try:
+            o, h, low, close = (float(cur[k]) for k in ("open", "high", "low", "close"))
+            po, pc = float(prev["open"]), float(prev["close"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not all(__import__("math").isfinite(v) for v in (o, h, low, close, po, pc)):
+            continue
+        if h < max(o, close) or low > min(o, close) or h <= low:
             continue
 
-        body = abs(c - o)
-        candle_range = h - l if (h - l) > 0 else 0.01
-        lower_shadow = min(o, c) - l
-        upper_shadow = h - max(o, c)
+        date = cur.get("date")
+        body = abs(close - o)
+        candle_range = h - low
+        lower_shadow = min(o, close) - low
+        upper_shadow = h - max(o, close)
+        body_floor = max(candle_range * 0.02, 1e-9)
 
-        # 1. Hammer (Long lower shadow >= 1.8x body, tiny upper shadow, at local dip)
-        if lower_shadow >= 1.8 * body and upper_shadow <= 0.3 * candle_range and body > 0:
-            status_text = "Active Today" if i == n - 1 else ("Last Trading Session" if i == n - 2 else f"Formed on {d}")
+        def add(algo_id, name, badge, explanation):
             detected.append({
-                "algo_id": "hammer",
-                "name": "Hammer Reversal",
-                "date": d,
-                "price": c,
-                "badge": "Candlestick Reversal",
-                "status": status_text,
-                "timing": "Last Session" if i == n - 2 else ("Today" if i == n - 1 else d),
-                "explanation": "Long lower shadow shows institutional buyers actively absorbed selling pressure at session lows."
+                "algo_id": algo_id, "name": name, "date": date,
+                "price": round(close, 2), "badge": badge,
+                "explanation": explanation,
             })
 
-        # 2. Bullish Engulfing
-        po = prev.get("open", 0)
-        pc = prev.get("close", 0)
-        if pc < po and c > o and c >= po and o <= pc:
-            status_text = "Active Today" if i == n - 1 else ("Last Trading Session" if i == n - 2 else f"Formed on {d}")
-            detected.append({
-                "algo_id": "bullish_engulfing",
-                "name": "Bullish Engulfing",
-                "date": d,
-                "price": c,
-                "badge": "High Conviction",
-                "status": status_text,
-                "timing": "Last Session" if i == n - 2 else ("Today" if i == n - 1 else d),
-                "explanation": "Bullish expansion candle completely engulfed previous candle body, confirming aggressive accumulation."
-            })
+        # Hammer and inverted hammer: small real body with a dominant wick.
+        if body >= body_floor and lower_shadow >= 2 * body and upper_shadow <= 0.35 * candle_range:
+            add("hammer", "Hammer Reversal", "Candlestick Reversal",
+                "Long lower wick and small body indicate rejection of lower prices.")
+        if body >= body_floor and upper_shadow >= 2 * body and lower_shadow <= 0.35 * candle_range:
+            add("hammer", "Inverted Hammer", "Candlestick Reversal",
+                "Long upper wick after a decline can signal a bullish reversal; confirmation is required.")
 
-        # 3. EMA 9 / 21 Golden Cross
-        e9_cur = cur.get("ema9")
-        e21_cur = cur.get("ema21")
-        e9_prev = prev.get("ema9")
-        e21_prev = prev.get("ema21")
-        if (e9_cur is not None and e21_cur is not None and 
-            e9_prev is not None and e21_prev is not None):
-            if e9_cur > e21_cur and e9_prev <= e21_prev:
-                status_text = "Active Today" if i == n - 1 else ("Last Trading Session" if i == n - 2 else f"Formed on {d}")
-                detected.append({
-                    "algo_id": "ema_golden_cross",
-                    "name": "EMA 9/21 Golden Cross",
-                    "date": d,
-                    "price": c,
-                    "badge": "Trend Momentum",
-                    "status": status_text,
-                    "timing": "Last Session" if i == n - 2 else ("Today" if i == n - 1 else d),
-                    "explanation": "Fast 9-EMA crossed above structural 21-EMA, confirming positive trend momentum."
-                })
-            elif e9_cur < e21_cur and e9_prev >= e21_prev:
-                status_text = "Active Today" if i == n - 1 else ("Last Trading Session" if i == n - 2 else f"Formed on {d}")
-                detected.append({
-                    "algo_id": "ema_golden_cross",
-                    "name": "EMA 9/21 Bearish Crossover",
-                    "date": d,
-                    "price": c,
-                    "badge": "Trend Exhaustion",
-                    "status": status_text,
-                    "timing": "Last Session" if i == n - 2 else ("Today" if i == n - 1 else d),
-                    "explanation": "Fast 9-EMA crossed below structural 21-EMA, signaling short-term trend exhaustion."
-                })
+        # Engulfing patterns use the real bodies of two consecutive candles.
+        if pc < po and close > o and o <= pc and close >= po:
+            add("bullish_engulfing", "Bullish Engulfing", "Bullish Reversal",
+                "Current bullish real body engulfs the prior bearish real body.")
+        if pc > po and close < o and o >= pc and close <= po:
+            add("bearish_engulfing", "Bearish Engulfing", "Bearish Reversal",
+                "Current bearish real body engulfs the prior bullish real body.")
 
-        # 4. VWAP Defense / Rejection
-        vwap = cur.get("vwap")
-        if vwap and l <= vwap and c > vwap and (c - o) > 0:
-            status_text = "Active Today" if i == n - 1 else ("Last Trading Session" if i == n - 2 else f"Formed on {d}")
-            detected.append({
-                "algo_id": "vwap_pullback",
-                "name": "VWAP Defense",
-                "date": d,
-                "price": c,
-                "badge": "Institutional VWAP",
-                "status": status_text,
-                "timing": "Last Session" if i == n - 2 else ("Today" if i == n - 1 else d),
-                "explanation": "Price tested volume-weighted average benchmark and bounced into positive session territory."
-            })
+        # EMA cross requires both current and previous indicator values.
+        try:
+            e9, e21 = float(cur["ema9"]), float(cur["ema21"])
+            pe9, pe21 = float(prev["ema9"]), float(prev["ema21"])
+            if e9 > e21 and pe9 <= pe21:
+                add("ema_golden_cross", "EMA 9/21 Golden Cross", "Trend Momentum",
+                    "EMA 9 crossed above EMA 21 on the latest completed bar.")
+            elif e9 < e21 and pe9 >= pe21:
+                add("ema_golden_cross", "EMA 9/21 Bearish Cross", "Trend Exhaustion",
+                    "EMA 9 crossed below EMA 21 on the latest completed bar.")
+        except (KeyError, TypeError, ValueError):
+            pass
 
-        # 5. Breakout above 10-day local resistance
-        if i >= 10:
-            prev_highs = max([chart_data[k].get("high", 0) for k in range(i - 10, i)])
-            if c > prev_highs and prev.get("close", 0) <= prev_highs:
-                status_text = "Active Today" if i == n - 1 else ("Last Trading Session" if i == n - 2 else f"Formed on {d}")
-                detected.append({
-                    "algo_id": "orb_breakout",
-                    "name": "ORB Range Breakout",
-                    "date": d,
-                    "price": c,
-                    "badge": "Momentum Breakout",
-                    "status": status_text,
-                    "timing": "Last Session" if i == n - 2 else ("Today" if i == n - 1 else d),
-                    "explanation": "Decisive expansion breakout above 10-day local consolidation resistance."
-                })
+        # Daily 20-bar breakout with volume confirmation (not mislabeled as intraday ORB).
+        if i >= 20:
+            lookback = chart_data[i - 20:i]
+            try:
+                prior_high = max(float(bar["high"]) for bar in lookback)
+                prior_volumes = [float(bar.get("volume", 0) or 0) for bar in lookback]
+                current_volume = float(cur.get("volume", 0) or 0)
+                average_volume = sum(prior_volumes) / len(prior_volumes)
+                if close > prior_high and pc <= prior_high and average_volume > 0 and current_volume >= 1.5 * average_volume:
+                    add("breakout_volume", "20-Day Breakout + Volume", "Volume-Confirmed Breakout",
+                        "Close broke the prior 20-session high with volume at least 1.5x its prior 20-session average.")
+            except (KeyError, TypeError, ValueError):
+                pass
 
-    # Return distinct latest formations, sorted by newest first
+    # Keep the newest confirmed instance of each pattern/date, newest first.
+    unique = []
     seen = set()
-    unique_detected = []
     for item in reversed(detected):
-        key = (item["name"], item["date"])
+        key = (item["algo_id"], item["name"], item["date"])
         if key not in seen:
             seen.add(key)
-            unique_detected.append(item)
-        if len(unique_detected) >= 6:
+            unique.append(item)
+        if len(unique) >= 12:
             break
-
-    # No synthetic fallback: an empty result means no qualifying pattern was found.
-
-    return unique_detected
+    return unique
