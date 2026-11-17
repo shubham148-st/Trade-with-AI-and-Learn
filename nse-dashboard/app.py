@@ -541,7 +541,8 @@ def analysis_live(symbol):
 
 from algo_kb import ALGO_DIRECTORY, get_observed_feed
 from paper_trading import (
-    get_paper_summary, execute_order, auto_paper_trade_signals, reset_paper_account
+    get_paper_summary, execute_order, auto_paper_trade_signals, reset_paper_account,
+    get_agent_config, update_agent_config, cancel_pending_order, simulate_date, check_pending_orders
 )
 
 
@@ -570,14 +571,17 @@ def get_algo_detail(algo_id):
 @app.route("/api/paper/summary")
 def paper_summary():
     """Returns current paper trading portfolio, balances, active positions, stats."""
-    # Build quick map of latest prices for open positions
+    # Build quick map of latest prices for open positions & pending orders
     state_summary = get_paper_summary()
-    open_syms = list(state_summary["positions"].keys())
+    open_syms = list(state_summary.get("positions", {}).keys())
+    pending_syms = [p.get("symbol") for p in state_summary.get("pending_orders", []) if p.get("symbol")]
+    all_syms = list(set(open_syms + pending_syms))
+
     prices = {}
-    if open_syms:
+    if all_syms:
         try:
-            tickers = yf.Tickers(" ".join(open_syms))
-            for sym in open_syms:
+            tickers = yf.Tickers(" ".join(all_syms))
+            for sym in all_syms:
                 try:
                     price = _safe_float(getattr(tickers.tickers[sym].fast_info, "last_price", None))
                     if price:
@@ -591,26 +595,73 @@ def paper_summary():
 
 @app.route("/api/paper/order", methods=["POST"])
 def paper_order():
-    """Places a manual or algorithmic paper order."""
+    """Places a manual or algorithmic paper order with Groww/Zerodha features."""
     data = request.json or {}
     symbol = data.get("symbol")
     side = data.get("side", "BUY").upper()
     qty = data.get("qty")
     price = data.get("price")
+    order_type = data.get("order_type", "MARKET").upper()
+    trigger_price = data.get("trigger_price")
+    product_type = data.get("product_type", "CNC").upper()
     stop_loss = data.get("stop_loss")
     target = data.get("target")
-    algo_name = data.get("algo_name", "Manual")
+    algo_name = data.get("algo_name", "Manual Order")
+    strategy_source = data.get("strategy_source", "MANUAL")
 
-    if not symbol or not qty or not price:
-        return jsonify({"error": "Missing symbol, qty or price"}), 400
+    if not symbol or not qty:
+        return jsonify({"error": "Missing symbol or qty"}), 400
 
-    res = execute_order(symbol, side, qty, price, stop_loss, target, algo_name)
+    if order_type == "MARKET" and not price:
+        # fetch latest price
+        try:
+            t = yf.Ticker(symbol)
+            price = _safe_float(getattr(t.fast_info, "last_price", None))
+        except Exception:
+            price = None
+        if not price:
+            return jsonify({"error": f"Could not determine market price for {symbol}"}), 400
+
+    res = execute_order(
+        symbol=symbol,
+        side=side,
+        qty=qty,
+        price=price,
+        stop_loss=stop_loss,
+        target=target,
+        algo_name=algo_name,
+        order_type=order_type,
+        trigger_price=trigger_price,
+        product_type=product_type,
+        strategy_source=strategy_source
+    )
     return jsonify(res)
+
+
+@app.route("/api/paper/cancel_order", methods=["POST"])
+def paper_cancel_order():
+    """Cancels a pending limit/SL order."""
+    data = request.json or {}
+    order_id = data.get("order_id")
+    if not order_id:
+        return jsonify({"error": "order_id is required"}), 400
+    res = cancel_pending_order(order_id)
+    return jsonify(res)
+
+
+@app.route("/api/paper/agent_config", methods=["GET", "POST"])
+def paper_agent_config():
+    """Get or update Agent configuration guardrails & auto-trade permissions."""
+    if request.method == "POST":
+        data = request.json or {}
+        updated = update_agent_config(data)
+        return jsonify({"success": True, "agent_config": updated})
+    return jsonify(get_agent_config())
 
 
 @app.route("/api/paper/auto_execute", methods=["POST"])
 def paper_auto_execute():
-    """Runs automated algo executor based on latest screened signals."""
+    """Runs automated algo executor based on latest screened signals if enabled."""
     data = request.json or {}
     signals = data.get("signals", [])
     
@@ -630,9 +681,20 @@ def paper_auto_execute():
         except Exception:
             pass
 
-    executed = auto_paper_trade_signals(signals, prices)
+    execution_res = auto_paper_trade_signals(signals, prices)
     summary = get_paper_summary(prices)
-    return jsonify({"executed": executed, "summary": summary})
+    return jsonify({"execution": execution_res, "summary": summary})
+
+
+@app.route("/api/paper/simulate_date", methods=["POST"])
+def paper_simulate_date():
+    """Simulates portfolio value on a historical date (Time Machine)."""
+    data = request.json or {}
+    target_date = data.get("target_date")
+    if not target_date:
+        return jsonify({"error": "target_date (YYYY-MM-DD) is required"}), 400
+    res = simulate_date(target_date)
+    return jsonify(res)
 
 
 @app.route("/api/paper/reset", methods=["POST"])
