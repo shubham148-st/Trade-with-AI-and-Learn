@@ -34,10 +34,16 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
   const [observedData, setObservedData] = useState({ stats: {}, available_patterns: [], timeline: [], signals: [] });
   const [isLoadingObserved, setIsLoadingObserved] = useState(false);
 
-  // Floating Overlay states (non-displacing hovering modal)
-  const [hoveredStrategy, setHoveredStrategy] = useState(null); // Left Row overlay (Textbook)
-  const [hoveredInstance, setHoveredInstance] = useState(null); // Right Row overlay (Real Pattern)
+  // Active / Pinned / Hovered inspection states
+  const [selectedStrategy, setSelectedStrategy] = useState(null);
+  const [selectedInstance, setSelectedInstance] = useState(null);
+  const [hoveredStrategy, setHoveredStrategy] = useState(null);
+  const [hoveredInstance, setHoveredInstance] = useState(null);
   const [isOverlayPinned, setIsOverlayPinned] = useState(false);
+
+  // Active items: preview on hover, otherwise retain the selected item so graphs are permanently visible
+  const activeStrategy = hoveredStrategy || selectedStrategy;
+  const activeInstance = hoveredInstance || selectedInstance;
 
   // 1. Fetch Algorithmic Strategies Directory
   useEffect(() => {
@@ -55,6 +61,25 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
         console.error('Failed to load algorithms directory', err);
       });
   }, []);
+
+  // When algos load or highlightedAlgoId changes, select and display the strategy graph immediately
+  useEffect(() => {
+    if (!algos || algos.length === 0) return;
+    if (highlightedAlgoId) {
+      const match = algos.find(a => a.id === highlightedAlgoId || (a.id && a.id.toLowerCase() === highlightedAlgoId.toLowerCase()));
+      if (match) {
+        setSelectedStrategy(match);
+        setSelectedInstance(null);
+        setIsOverlayPinned(true);
+        return;
+      }
+    }
+    // If nothing is selected yet, default to the first strategy so the candlestick graph is displayed right away
+    if (!selectedStrategy && !selectedInstance && !hoveredStrategy && !hoveredInstance) {
+      setSelectedStrategy(algos[0]);
+      setIsOverlayPinned(true);
+    }
+  }, [highlightedAlgoId, algos]);
 
   // 2. Fetch Observed Algos Feed (1D, 1W, 1M, ALL + Pattern Choice)
   useEffect(() => {
@@ -179,7 +204,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
         </div>
 
         <div style={{ position: 'relative', width: '100%', overflowX: 'auto' }} className="hide-scrollbar">
-          <svg width={width} height={height} style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}>
+          <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', maxWidth: `${width}px`, height: 'auto', display: 'block', margin: '0 auto', overflow: 'visible' }}>
             {[0.25, 0.5, 0.75].map((pct, idx) => {
               const yVal = padding.top + pct * (height - padding.top - padding.bottom);
               return <line key={idx} x1={padding.left} y1={yVal} x2={width - padding.right} y2={yVal} stroke="rgba(255,255,255,0.04)" strokeDasharray="3 3" />;
@@ -215,7 +240,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
               const y = scaleY(annPrice);
               const isEntry = ann.type === 'entry';
               const isSL = ann.type === 'stop_loss';
-              const badgeColor = isEntry ? '#2ed573' : (isSL ? '#ff4757' : '#00d4aa');
+              const badgeColor = isEntry ? 'var(--green, #2ed573)' : (isSL ? 'var(--red, #ff4757)' : 'var(--accent, #00d4aa)');
 
               return (
                 <g key={idx}>
@@ -235,8 +260,8 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
           {Array.isArray(annotations) && annotations.map((ann, idx) => {
             const isEntry = ann.type === 'entry';
             const isSL = ann.type === 'stop_loss';
-            const badgeColor = isEntry ? '#2ed573' : (isSL ? '#ff4757' : '#00d4aa');
-            const bg = isEntry ? 'rgba(46, 213, 115, 0.12)' : (isSL ? 'rgba(255, 71, 87, 0.12)' : 'rgba(0, 212, 170, 0.12)');
+            const badgeColor = isEntry ? 'var(--green, #2ed573)' : (isSL ? 'var(--red, #ff4757)' : 'var(--accent, #00d4aa)');
+            const bg = isEntry ? 'var(--green-subtle, rgba(46, 213, 115, 0.15))' : (isSL ? 'var(--red-subtle, rgba(255, 71, 87, 0.15))' : 'var(--accent-subtle, rgba(0, 212, 170, 0.15))');
 
             return (
               <div key={idx} style={{ background: bg, border: `1px solid ${badgeColor}`, borderRadius: '4px', padding: '2px 7px', fontSize: '0.67rem', fontWeight: 700, color: badgeColor }}>
@@ -278,9 +303,9 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
     }
 
     const levels = [
-      { label: 'TRIGGER', price: entry_price, color: '#00d4aa' },
-      { label: 'STOP', price: stop_loss, color: '#ff4757' },
-      { label: 'TARGET', price: target_price, color: '#2ed573' }
+      { label: 'TRIGGER', price: entry_price, color: 'var(--accent, #00d4aa)' },
+      { label: 'STOP', price: stop_loss, color: 'var(--red, #ff4757)' },
+      { label: 'TARGET', price: target_price, color: 'var(--green, #2ed573)' }
     ];
 
     return (
@@ -295,7 +320,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
             padding: '2px 8px',
             borderRadius: '4px',
             fontWeight: 700,
-            background: status === 'Target Hit' ? 'rgba(46, 213, 115, 0.15)' : (status === 'Stopped Out' ? 'rgba(255, 71, 87, 0.15)' : 'rgba(0, 212, 170, 0.15)'),
+            background: status === 'Target Hit' ? 'var(--green-subtle, rgba(46, 213, 115, 0.15))' : (status === 'Stopped Out' ? 'var(--red-subtle, rgba(255, 71, 87, 0.15))' : 'var(--accent-subtle, rgba(0, 212, 170, 0.15))'),
             color: status === 'Target Hit' ? 'var(--green, #2ed573)' : (status === 'Stopped Out' ? 'var(--red, #ff4757)' : 'var(--accent, #00d4aa)')
           }}>
             {status}
@@ -303,7 +328,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
         </div>
 
         <div style={{ position: 'relative', width: '100%', overflowX: 'auto' }} className="hide-scrollbar">
-          <svg width={width} height={height} style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}>
+          <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', maxWidth: `${width}px`, height: 'auto', display: 'block', margin: '0 auto', overflow: 'visible' }}>
             {[0.25, 0.5, 0.75].map((pct, idx) => {
               const yVal = padding.top + pct * (height - padding.top - padding.bottom);
               return <line key={idx} x1={padding.left} y1={yVal} x2={width - padding.right} y2={yVal} stroke="rgba(255,255,255,0.04)" strokeDasharray="3 3" />;
@@ -435,28 +460,33 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
   };
 
   // ── Strategy Specification Overlay (Mounted on Right Column) ──
-  const renderStrategyOverlay = () => {
-    if (!hoveredStrategy) return null;
+  const renderStrategyOverlay = (strat = activeStrategy) => {
+    if (!strat) return null;
     return (
       <div className="algo-column-overlay hide-scrollbar">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {renderIcon(hoveredStrategy.icon_name, 18, 'var(--accent, #00d4aa)')}
+            {renderIcon(strat.icon_name, 18, 'var(--accent, #00d4aa)')}
             <div>
               <div style={{ fontSize: '0.64rem', color: 'var(--accent, #00d4aa)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 TEXTBOOK SPECIFICATION & RULES
               </div>
               <h3 style={{ fontSize: '1.02rem', fontWeight: 800, color: '#ffffff', marginTop: '1px' }}>
-                {hoveredStrategy.name}
+                {strat.name}
               </h3>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.68rem', background: 'rgba(0, 212, 170, 0.12)', color: 'var(--accent, #00d4aa)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
-              {hoveredStrategy.category}
+              {strat.category}
             </span>
             <button 
-              onClick={(e) => { e.stopPropagation(); setHoveredStrategy(null); setIsOverlayPinned(false); }}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setHoveredStrategy(null); 
+                setSelectedStrategy(null);
+                setIsOverlayPinned(false); 
+              }}
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border, #2a2d35)', borderRadius: '6px', color: 'var(--text-muted, #888888)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               title="Close Preview"
             >
@@ -466,27 +496,27 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
         </div>
 
         <p style={{ fontSize: '0.82rem', color: 'var(--text-main, #d1d5db)', lineHeight: 1.45, margin: 0, flexShrink: 0 }}>
-          {hoveredStrategy.summary}
+          {strat.summary}
         </p>
 
         {/* SVG Textbook Chart */}
         <div style={{ flexShrink: 0 }}>
-          {renderTextbookChart(hoveredStrategy)}
+          {renderTextbookChart(strat)}
         </div>
 
         {/* 3 Strict Rules */}
         <div className="algo-modal-rules-grid" style={{ flexShrink: 0 }}>
           <div style={{ background: 'rgba(46, 213, 115, 0.08)', border: '1px solid rgba(46, 213, 115, 0.25)', borderRadius: '6px', padding: '6px 8px' }}>
             <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--green, #2ed573)' }}>ENTRY TRIGGER</div>
-            <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{hoveredStrategy.entry_rule}</div>
+            <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{strat.entry_rule}</div>
           </div>
           <div style={{ background: 'rgba(255, 71, 87, 0.08)', border: '1px solid rgba(255, 71, 87, 0.25)', borderRadius: '6px', padding: '6px 8px' }}>
             <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--red, #ff4757)' }}>STOP LOSS</div>
-            <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{hoveredStrategy.stop_loss_rule}</div>
+            <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{strat.stop_loss_rule}</div>
           </div>
           <div style={{ background: 'rgba(0, 212, 170, 0.08)', border: '1px solid rgba(0, 212, 170, 0.25)', borderRadius: '6px', padding: '6px 8px' }}>
             <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--accent, #00d4aa)' }}>TARGET EXIT</div>
-            <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{hoveredStrategy.target_rule}</div>
+            <div style={{ fontSize: '0.72rem', color: '#d1d5db', marginTop: '3px', lineHeight: 1.3 }}>{strat.target_rule}</div>
           </div>
         </div>
       </div>
@@ -494,30 +524,35 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
   };
 
   // ── Real Execution Pattern Overlay (Mounted on Left Column) ──
-  const renderInstanceOverlay = () => {
-    if (!hoveredInstance) return null;
+  const renderInstanceOverlay = (inst = activeInstance) => {
+    if (!inst) return null;
     return (
       <div className="algo-column-overlay hide-scrollbar">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#ffffff', background: 'rgba(255,255,255,0.08)', padding: '3px 8px', borderRadius: '4px', fontFamily: 'monospace' }}>
-              {hoveredInstance.stock_clean || hoveredInstance.symbol}
+              {inst.stock_clean || inst.symbol}
             </span>
             <div>
               <div style={{ fontSize: '0.64rem', color: 'var(--accent, #00d4aa)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 REAL MARKET EXECUTION RECORD
               </div>
               <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', marginTop: '1px' }}>
-                {hoveredInstance.algo_name}
+                {inst.algo_name}
               </h3>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>
-              {hoveredInstance.timestamp}
+              {inst.timestamp}
             </span>
             <button 
-              onClick={(e) => { e.stopPropagation(); setHoveredInstance(null); setIsOverlayPinned(false); }}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setHoveredInstance(null); 
+                setSelectedInstance(null);
+                setIsOverlayPinned(false); 
+              }}
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border, #2a2d35)', borderRadius: '6px', color: 'var(--text-muted, #888888)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               title="Close Preview"
             >
@@ -528,30 +563,30 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
 
         {/* SVG Real Pattern Chart */}
         <div style={{ flexShrink: 0 }}>
-          {renderRealPatternChart(hoveredInstance.real_chart)}
+          {renderRealPatternChart(inst.real_chart)}
         </div>
 
         {/* Instance Execution Metrics */}
         <div className="algo-modal-metrics-grid" style={{ flexShrink: 0 }}>
           <div>
             <span style={{ color: 'var(--text-muted, #888888)' }}>Trigger Price: </span>
-            <strong style={{ color: '#ffffff', fontFamily: 'monospace' }}>₹{hoveredInstance.price}</strong>
+            <strong style={{ color: '#ffffff', fontFamily: 'monospace' }}>₹{inst.price}</strong>
           </div>
           <div>
             <span style={{ color: 'var(--text-muted, #888888)' }}>Outcome: </span>
-            <strong style={{ color: hoveredInstance.status === 'Target Hit' ? 'var(--green, #2ed573)' : (hoveredInstance.status === 'Stopped Out' ? 'var(--red, #ff4757)' : 'var(--accent, #00d4aa)') }}>
-              {hoveredInstance.status}
+            <strong style={{ color: inst.status === 'Target Hit' ? 'var(--green, #2ed573)' : (inst.status === 'Stopped Out' ? 'var(--red, #ff4757)' : 'var(--accent, #00d4aa)') }}>
+              {inst.status}
             </strong>
           </div>
           <div>
             <span style={{ color: 'var(--text-muted, #888888)' }}>P&L Return: </span>
-            <strong style={{ color: hoveredInstance.return_pct > 0 ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)', fontFamily: 'monospace' }}>
-              {hoveredInstance.return_pct > 0 ? '+' : ''}{hoveredInstance.return_pct}%
+            <strong style={{ color: inst.return_pct > 0 ? 'var(--green, #2ed573)' : 'var(--red, #ff4757)', fontFamily: 'monospace' }}>
+              {inst.return_pct > 0 ? '+' : ''}{inst.return_pct}%
             </strong>
           </div>
           <div>
             <span style={{ color: 'var(--text-muted, #888888)' }}>Confidence: </span>
-            <strong style={{ color: 'var(--accent, #00d4aa)' }}>{hoveredInstance.confidence}%</strong>
+            <strong style={{ color: 'var(--accent, #00d4aa)' }}>{inst.confidence}%</strong>
           </div>
         </div>
       </div>
@@ -600,8 +635,8 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
 
         {/* ── LEFT ROW: Strategy Encyclopedia & Library (Responsive Card) ── */}
         <div className="algo-column-card">
-          {/* Real Pattern Execution Overlay (Triggered by hovering Right Row trades) */}
-          {hoveredInstance && renderInstanceOverlay()}
+          {/* Real Pattern Execution Overlay (Triggered by hovering/clicking Right Row trades) */}
+          {activeInstance && renderInstanceOverlay(activeInstance)}
           {/* Header & Search */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -658,7 +693,8 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
             }}
           >
             {filteredAlgos.map(algo => {
-              const isHovered = hoveredStrategy?.id === algo.id;
+              const isSelected = activeStrategy?.id === algo.id;
+              const isHovered = hoveredStrategy?.id === algo.id || isSelected;
               return (
                 <div
                   key={algo.id}
@@ -674,18 +710,20 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                     }
                   }}
                   onClick={() => {
+                    setSelectedStrategy(algo);
                     setHoveredStrategy(algo);
+                    setSelectedInstance(null);
                     setHoveredInstance(null);
-                    setIsOverlayPinned(prev => !prev || hoveredStrategy?.id !== algo.id);
+                    setIsOverlayPinned(true);
                   }}
                   style={{
-                    background: isHovered ? 'rgba(0, 212, 170, 0.08)' : 'var(--bg-secondary, #14171d)',
-                    border: '1px solid ' + (isHovered ? 'var(--accent, #00d4aa)' : 'var(--border, #2a2d35)'),
+                    background: isSelected ? 'rgba(0, 212, 170, 0.12)' : (isHovered ? 'rgba(0, 212, 170, 0.08)' : 'var(--bg-secondary, #14171d)'),
+                    border: '1px solid ' + (isSelected ? 'var(--accent, #00d4aa)' : (isHovered ? 'rgba(0, 212, 170, 0.5)' : 'var(--border, #2a2d35)')),
                     borderRadius: '8px',
                     padding: '11px 14px',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
-                    boxShadow: isHovered ? '0 0 12px rgba(0, 212, 170, 0.15)' : 'none',
+                    boxShadow: isSelected ? '0 0 12px rgba(0, 212, 170, 0.25)' : (isHovered ? '0 0 12px rgba(0, 212, 170, 0.15)' : 'none'),
                     flexShrink: 0
                   }}
                 >
@@ -736,8 +774,8 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
 
         {/* ── RIGHT ROW: Recorded Algorithmic Instances & Real Graph Execution (Responsive Card) ── */}
         <div className="algo-column-card">
-          {/* Strategy Specification Overlay (Triggered by hovering Left Row strategies) */}
-          {hoveredStrategy && renderStrategyOverlay()}
+          {/* Strategy Specification Overlay (Triggered by hovering/clicking Left Row strategies) */}
+          {activeStrategy && renderStrategyOverlay(activeStrategy)}
           {/* Header & Controls: 1D | 1W | 1M | ALL + Pattern Choice (Responsive Group) */}
           <div className="algo-control-group" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', flexShrink: 0 }}>
             <div className="algo-control-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -828,7 +866,8 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
               </div>
             ) : (
               signalsList.map((sig, idx) => {
-                const isHovered = hoveredInstance?.id === sig.id;
+                const isSelected = activeInstance?.id === sig.id;
+                const isHovered = hoveredInstance?.id === sig.id || isSelected;
                 const isTargetHit = sig.status === 'Target Hit';
                 const isStoppedOut = sig.status === 'Stopped Out';
                 const statusBg = isTargetHit ? 'rgba(46, 213, 115, 0.12)' : (isStoppedOut ? 'rgba(255, 71, 87, 0.12)' : 'rgba(0, 212, 170, 0.12)');
@@ -851,18 +890,20 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                       }
                     }}
                     onClick={() => {
+                      setSelectedInstance(sig);
                       setHoveredInstance(sig);
+                      setSelectedStrategy(null);
                       setHoveredStrategy(null);
-                      setIsOverlayPinned(prev => !prev || hoveredInstance?.id !== sig.id);
+                      setIsOverlayPinned(true);
                     }}
                     style={{
-                      background: isHovered ? 'rgba(0, 212, 170, 0.08)' : 'var(--bg-secondary, #14171d)',
-                      border: '1px solid ' + (isHovered ? 'var(--accent, #00d4aa)' : (idx === 0 ? 'rgba(255, 255, 255, 0.14)' : 'var(--border, #2a2d35)')),
+                      background: isSelected ? 'rgba(0, 212, 170, 0.12)' : (isHovered ? 'rgba(0, 212, 170, 0.08)' : 'var(--bg-secondary, #14171d)'),
+                      border: '1px solid ' + (isSelected ? 'var(--accent, #00d4aa)' : (isHovered ? 'rgba(0, 212, 170, 0.5)' : (idx === 0 ? 'rgba(255, 255, 255, 0.14)' : 'var(--border, #2a2d35)'))),
                       borderRadius: '8px',
                       padding: '11px 14px',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
-                      boxShadow: isHovered ? '0 0 12px rgba(0, 212, 170, 0.15)' : 'none',
+                      boxShadow: isSelected ? '0 0 12px rgba(0, 212, 170, 0.25)' : (isHovered ? '0 0 12px rgba(0, 212, 170, 0.15)' : 'none'),
                       flexShrink: 0
                     }}
                   >

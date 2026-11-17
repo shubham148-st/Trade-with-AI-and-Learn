@@ -10,6 +10,7 @@ import {
   Star
 } from 'lucide-react';
 import NiftyModal from './NiftyModal';
+import { preloadChunk } from '../utils/preloadChunks';
 
 const SECTOR_MAP = {
   BANKING: ['HDFCBANK.NS', 'ICICIBANK.NS', 'SBIN.NS', 'KOTAKBANK.NS', 'AXISBANK.NS'],
@@ -275,12 +276,15 @@ export default function MarketOverview({
               border: '1px solid var(--border, #2a2d35)',
               borderRadius: '6px',
               padding: '4px 10px',
-              width: '220px'
+              width: '220px',
+              minHeight: '36px',
+              boxSizing: 'border-box'
             }}>
               <Search size={14} color="var(--text-muted, #888888)" />
               <input
                 type="text"
-                placeholder="Search stocks..."
+                placeholder="Search stocks…"
+                aria-label="Search stocks"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -392,7 +396,10 @@ export default function MarketOverview({
                           cursor: 'pointer',
                           transition: 'background 0.12s'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                        onMouseEnter={(e) => {
+                          preloadChunk('StockPage');
+                          e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                        }}
                         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       >
                         <td style={{ padding: '10px 8px', fontWeight: 600, color: '#ffffff' }}>

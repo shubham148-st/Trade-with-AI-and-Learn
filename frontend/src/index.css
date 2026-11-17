@@ -10,11 +10,15 @@
   --border-light: #3a3d45;
   --accent: #00d4aa;
   --accent-muted: rgba(0, 212, 170, 0.12);
+  --accent-subtle: rgba(0, 212, 170, 0.15);
   --green: #2ed573;
   --green-muted: rgba(46, 213, 115, 0.12);
+  --green-subtle: rgba(46, 213, 115, 0.15);
   --red: #ff4757;
   --red-muted: rgba(255, 71, 87, 0.12);
+  --red-subtle: rgba(255, 71, 87, 0.15);
   --amber: #ffa502;
+  --amber-subtle: rgba(255, 165, 2, 0.15);
   --text-main: #d1d5db;
   --text-muted: #888888;
   --text-sub: #6b7280;
@@ -163,6 +167,10 @@ button {
 }
 
 @media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
   main {
     padding: 0.6rem !important;
     width: 100% !important;

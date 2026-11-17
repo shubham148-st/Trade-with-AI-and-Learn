@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import usePageVisibility from '../hooks/usePageVisibility';
 import { 
   Wallet, 
   TrendingUp, 
@@ -127,15 +128,8 @@ export default function PaperTrading({ stocks = [], prefilledOrder, onOrderDone 
     }
   }, [prefilledOrder]);
 
-  // Initial fetch and interval
-  useEffect(() => {
-    fetchPaperSummary();
-    fetchAgentConfig();
-    const interval = setInterval(fetchPaperSummary, 12000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchPaperSummary = async () => {
+  const fetchPaperSummary = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.hidden) return;
     try {
       const res = await fetch('/api/paper/summary');
       if (res.ok) {
@@ -145,9 +139,9 @@ export default function PaperTrading({ stocks = [], prefilledOrder, onOrderDone 
     } catch (e) {
       console.error('Failed to fetch paper summary:', e);
     }
-  };
+  }, []);
 
-  const fetchAgentConfig = async () => {
+  const fetchAgentConfig = useCallback(async () => {
     try {
       const res = await fetch('/api/paper/agent_config');
       if (res.ok) {
@@ -158,7 +152,23 @@ export default function PaperTrading({ stocks = [], prefilledOrder, onOrderDone 
     } catch (e) {
       console.error('Failed to fetch agent config:', e);
     }
-  };
+  }, []);
+
+  // Page Visibility Gating: sync portfolio immediately on tab refocus
+  usePageVisibility(fetchPaperSummary);
+
+  // Initial fetch and interval
+  useEffect(() => {
+    fetchPaperSummary();
+    fetchAgentConfig();
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchPaperSummary();
+      }
+    }, 12000);
+
+    return () => clearInterval(interval);
+  }, [fetchPaperSummary, fetchAgentConfig]);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);

@@ -19,6 +19,7 @@ import {
   Calendar,
   Star
 } from 'lucide-react';
+import { fetchWithCache } from '../utils/queryCache';
 import { 
   createChart, 
   ColorType, 
@@ -99,16 +100,13 @@ export default function StockPage({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [terminalOpen]);
 
-  // Fetch real-time quote
+  // Fetch real-time quote with SWR caching & deduplication
   useEffect(() => {
     let isMounted = true;
     const fetchQuote = async () => {
       try {
-        const res = await fetch(`/api/quote/${encodeURIComponent(symbol)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted) setQuote(data);
-        }
+        const data = await fetchWithCache(`/api/quote/${encodeURIComponent(symbol)}`, {}, { ttl: 20000, staleWhileRevalidate: true });
+        if (isMounted && data) setQuote(data);
       } catch (err) {
         console.error('Failed to load quote:', err);
       }
@@ -356,9 +354,11 @@ export default function StockPage({
     setChartError(null);
     setHoveredPoint(null);
     try {
-      const res = await fetch(`/api/history/${encodeURIComponent(symbol)}?period=${p}&interval=${inv}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
+      const json = await fetchWithCache(
+        `/api/history/${encodeURIComponent(symbol)}?period=${p}&interval=${inv}`,
+        {},
+        { ttl: 60000, staleWhileRevalidate: true }
+      );
       if (!json.data || json.data.length === 0) {
         throw new Error('No historical data found');
       }
@@ -850,6 +850,7 @@ export default function StockPage({
             <button
               onClick={handleToggleLineCandle}
               title={chartType === 'candlestick' ? 'Switch to Line Chart' : 'Switch to Candlesticks'}
+              aria-label={chartType === 'candlestick' ? 'Switch to Line Chart' : 'Switch to Candlesticks'}
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid var(--border, #2a2d35)',
@@ -939,7 +940,7 @@ export default function StockPage({
                         textAlign: 'left',
                         padding: '7px 10px',
                         borderRadius: '6px',
-                        background: chartType === opt.id ? 'rgba(0, 212, 170, 0.15)' : 'transparent',
+                        background: chartType === opt.id ? 'var(--accent-subtle, rgba(0, 212, 170, 0.15))' : 'transparent',
                         color: chartType === opt.id ? 'var(--accent, #00d4aa)' : '#d1d5db',
                         border: 'none',
                         cursor: 'pointer',
@@ -1103,7 +1104,7 @@ export default function StockPage({
                     <Sparkles size={16} color="var(--accent, #00d4aa)" /> News NLP Agent
                   </div>
                   <span style={{
-                    background: 'rgba(0, 212, 170, 0.15)',
+                    background: 'var(--accent-subtle, rgba(0, 212, 170, 0.15))',
                     color: 'var(--accent, #00d4aa)',
                     padding: '2px 8px',
                     borderRadius: '4px',
@@ -1140,7 +1141,7 @@ export default function StockPage({
                     <BarChart2 size={16} color="var(--accent, #00d4aa)" /> Volume & Flow Agent
                   </div>
                   <span style={{
-                    background: 'rgba(46, 213, 115, 0.15)',
+                    background: 'var(--green-subtle, rgba(46, 213, 115, 0.15))',
                     color: 'var(--green, #2ed573)',
                     padding: '2px 8px',
                     borderRadius: '4px',
@@ -1174,7 +1175,7 @@ export default function StockPage({
                     <Zap size={16} color="var(--accent, #00d4aa)" /> Algo Consensus
                   </div>
                   <span style={{
-                    background: 'rgba(0, 212, 170, 0.15)',
+                    background: 'var(--accent-subtle, rgba(0, 212, 170, 0.15))',
                     color: 'var(--accent, #00d4aa)',
                     padding: '2px 8px',
                     borderRadius: '4px',
