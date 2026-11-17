@@ -608,7 +608,8 @@ def full_analysis(symbol, stock_dict):
     e9 = calc_ema(c, 9)
     e21 = calc_ema(c, 21)
     e50 = calc_ema(c, 50) if len(c) >= 50 else pd.Series(dtype=float)
-    # Daily OHLCV cannot provide a true session VWAP; do not plot a misleading cumulative proxy.\n    vw = None\n    rs = calc_rsi(c)
+    # Daily OHLCV cannot provide a true session VWAP; omit the misleading proxy.
+    rs = calc_rsi(c)
     ml, ms_l, mh_s = calc_macd(c)
     bbu, _, bbl = calc_bollinger(c)
 
@@ -623,7 +624,7 @@ def full_analysis(symbol, stock_dict):
         if i < len(e9): pt["ema9"] = _sf(e9.iloc[i])
         if i < len(e21): pt["ema21"] = _sf(e21.iloc[i])
         if len(e50) > 0 and i < len(e50): pt["ema50"] = _sf(e50.iloc[i])
-        if i < len(vw): pt["vwap"] = _sf(vw.iloc[i])
+
         if i < len(rs): pt["rsi"] = _sf(rs.iloc[i])
         if i < len(ml):
             pt["macd"] = _sf(ml.iloc[i])
