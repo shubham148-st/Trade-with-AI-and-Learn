@@ -1,219 +1,210 @@
-# NSE Trader View
+# TRAI: TRADE with AI and Learn
 
-A high-performance market monitoring, quantitative technical analysis, and paper trading platform for National Stock Exchange of India (NSE) equities. The application pairs a Python/Flask analytical backend with a responsive React 19 frontend utilizing TradingView Lightweight Charts, client-side SWR caching, and a realistic broker-grade execution simulation engine.
+TRAI is an open-source trading workbench for National Stock Exchange of India (NSE) equities. It brings together real-time market telemetry, quantitative technical scanning, realistic broker-grade paper trading, and an algorithmic pattern learning lab into a single application.
 
----
-
-## Architecture Overview
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        React 19 Client (Vite)                          │
-│  ┌──────────────────┬─────────────────┬────────────────┬─────────────┐ │
-│  │ Market Overview  │ Stock Analysis  │ Scanner/Intel  │ Paper Trade │ │
-│  └──────────────────┴─────────────────┴────────────────┴─────────────┘ │
-│       │ Lightweight Charts    │ SWR Query Cache   │ Page Visibility   │
-└───────┼───────────────────────┼───────────────────┼───────────────────┘
-        │                       │                   │
-        ▼ REST APIs (Port 5500) ▼                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Flask Backend (Python 3.13)                     │
-│  ┌──────────────────────┬──────────────────────┬────────────────────┐  │
-│  │   Analysis Engine    │  Paper Trading Core  │  Algo Knowledge    │  │
-│  │  (pandas, indicators)│ (matching, charges)  │   (pattern catalog)│  │
-│  └──────────────────────┴──────────────────────┴────────────────────┘  │
-│         │ yfinance data stream          │ JSON State & In-memory Cache │
-└─────────┼───────────────────────────────┼──────────────────────────────┘
-          ▼                               ▼
-    NSE Market Feeds              paper_state.json
-```
-
-The system is decoupled into two primary tiers:
-1. **Backend Service (`nse-dashboard/`)**: Exposes REST endpoints for live quotes, historical candlestick data, multi-timeframe indicator calculations, pattern recognition, and virtual order matching.
-2. **Frontend Single Page Application (`frontend/`)**: Built on React 19 with route-level code splitting (`React.lazy` + `Suspense`), intent-based chunk prefetching, and custom design tokens for institutional dark-mode telemetry.
+Most retail traders end up juggling four separate tabs: TradingView for charting, a broker terminal for execution, financial news portals for sentiment, and static textbooks or YouTube videos for pattern study. TRAI consolidates these into a single self-hosted system that lets you analyze live price action, test algorithmic setups without risking capital, and study how classic price patterns perform against actual historical market data.
 
 ---
 
-## Core Features & Modules
+## What TRAI Does
 
-### 1. Market Overview & Benchmark Telemetry (`/`)
-- **Live Ticker Ribbon**: Scrolling marquee tracking real-time prices, net daily change, and percentage movement across top NSE equities.
-- **Benchmark Index Cards**: Real-time status cards for **NIFTY 50** and **NIFTY BANK**, displaying day high/low ranges, percentage spread, intraday sparklines, and detailed modal views.
-- **Sector Performance Heatmap**: Interactive performance breakdown across 9 industrial sectors (IT, Banking, Energy, Auto, Pharma, FMCG, Metals, Infrastructure, and Consumer Goods).
-- **Market Movers Matrix**: Automated filtering for Top Gainers, Top Losers, and Volume Shockers.
-- **Institutional Equity Screener**: High-density stock table featuring 52-week range progression bars, real-time search, multi-column sorting (Price, Change, Volume, Market Cap), and one-click comparative analysis.
-- **Multi-Asset Performance Overlay**: Modal comparison tool allowing up to 4 equities to be plotted on a normalized percentage-change chart.
+The platform is structured around three core workflows: **Trade**, **AI Analysis**, and **Learn**.
 
-### 2. Deep Technical Analysis & Charting (`/stocks/:symbol`)
-- **TradingView Lightweight Charts**: Multi-timeframe interactive charting engine supporting Candlestick, Area/Line, Baseline, and Bar visualizations.
-- **Timeframe Resolutions**: 1 Day (1m/5m intervals), 5 Days, 1 Month, 6 Months, 1 Year, 5 Years, and Maximum available history.
-- **Technical Indicator Overlays**:
-  - Exponential Moving Averages: EMA 9, EMA 20, EMA 50, and EMA 200.
-  - Bollinger Bands: 20-period moving average with 2.0 standard deviation envelopes.
-  - Supertrend Indicator: Real-time ATR-based trend direction and trailing stops.
-- **Oscillators & Momentum Sub-Charts**:
-  - Relative Strength Index (RSI 14) with overbought (70) and oversold (30) boundary lines.
-  - Moving Average Convergence Divergence (MACD 12, 26, 9) complete with signal line and histogram delta.
-  - Average True Range (ATR 14) for volatility measurement.
-- **Fundamental & Technical Telemetry**: P/E ratio, Market Cap, Beta, 52-week High/Low, Session VWAP, day turnover, and direct one-click trade prefill into the paper trading terminal.
+### 1. Trade (Market Telemetry & Charting)
+- **Live NSE Ticker & Index Tracking**: Real-time ticker ribbon and benchmark cards for NIFTY 50 and NIFTY BANK showing intraday spreads, day ranges, and sparklines.
+- **Sector Performance Heatmap**: Real-time performance breakdown across 9 sectors: IT, Banking, Energy, Auto, Pharma, FMCG, Metals, Infra, and Consumer Goods.
+- **Market Movers & Screener**: Live tracking of top gainers, losers, and volume shockers. Includes a high-density stock screener with 52-week high/low progress bars, customizable sorting, and instant search.
+- **TradingView Lightweight Charts**: Native canvas-based candlestick, line, area, and baseline charts covering timeframes from 1-day intraday up to multi-year history.
+- **Technical Overlays & Indicators**:
+  - Overlays: EMA (9, 20, 50, 200), Bollinger Bands (20, 2), and Supertrend.
+  - Oscillators: RSI (14) with overbought/oversold bands, MACD (12, 26, 9) with histogram deltas, and ATR (14) volatility bands.
+- **Normalized Multi-Asset Comparison**: Overlay and compare the percentage performance of up to 4 stocks simultaneously on a unified baseline.
 
-### 3. Quantitative Scanner & Technical Intelligence (`/ai-analysis`)
-- **Multi-Agent Evaluation Model**:
-  - **News Intelligence**: Aggregated financial news feed with automated sentiment classification (Bullish, Bearish, Neutral).
-  - **Historical Technical Structure**: Support/resistance level detection, swing high/low mapping, and multi-timeframe trend confluence scoring.
-  - **Strategy Setup Generator**: Algorithmic identification of Intraday Scalp, Momentum Breakout, Mean Reversion, and Trend Continuation setups.
-- **Actionable Execution Parameters**: Generated setups include exact Entry prices, Stop Loss limits, Target 1, Target 2, and calculated Risk-to-Reward (R:R) ratios.
-- **Order Flow & Volume Profiling**: Imbalance metrics, estimated institutional delivery percentage, and volume expansion tracking.
+### 2. AI (Quantitative Scanner & Strategy Engine)
+- **Multi-Agent Market Analysis**:
+  - **News Intelligence**: Automated scraping of financial news feeds with sentiment scoring (Bullish, Bearish, Neutral) to assess prevailing market narrative.
+  - **Technical Structure Scoring**: Algorithmic evaluation of support and resistance zones, swing levels, and multi-timeframe trend alignment.
+  - **Strategy Setup Generator**: Generates concrete trade setups for intraday scalps, momentum breakouts, mean reversion, and swing continuation.
+- **Discrete Risk Parameters**: Every generated setup outputs specific Entry levels, Stop Loss limits, Target 1, Target 2, and the calculated Risk-to-Reward (R:R) ratio.
+- **Order Flow & Volume Profiling**: Imbalance metrics, volume expansion tracking, and delivery percentage estimation to gauge institutional participation.
 
-### 4. Paper Trading Engine & Simulation Terminal (`/paper-trading`)
-- **Realistic Brokerage Model**: Modeled after standard Indian discount brokers (Zerodha / Groww fee structure):
-  - Brokerage: 0.03% or ₹20 flat cap per executed order.
-  - Securities Transaction Tax (STT): 0.1% on delivery (CNC) buy/sell; 0.025% on intraday (MIS) sell.
-  - Exchange turnover fees, SEBI turnover charges, Stamp Duty, and 18% GST on brokerage + transaction charges.
-- **Order Execution Engine**:
-  - Supported Order Types: `MARKET`, `LIMIT`, `SL` (Stop-Loss Limit), `SL-M` (Stop-Loss Market), and `GTT` (Good Till Triggered).
-  - Supported Product Types: `CNC` (Cash & Carry for swing holdings) and `INTRADAY` (MIS with margin).
-  - Bracket Orders: Define Stop Loss and Take Profit targets simultaneously with order submission.
-  - Continuous tick-level matching engine that fills pending limit and stop-loss orders against live price feeds.
+### 3. Learn (Algo Academy & Pattern Observer)
+- **Quantitative Pattern Catalog**: Deep-dive documentation on institutional trading setups, including VWAP Pullbacks, Opening Range Breakouts (ORB), Liquidity Sweeps, Wyckoff Springs, and EMA Ribbon Trends.
+- **Theoretical vs. Real Market Visualizer**: Interactive SVG charts displaying the idealized textbook version of a candlestick setup side-by-side with real historical market executions.
+- **Pattern Observer Feed**: An automated observer that scans tracked NSE stocks for live pattern occurrences, logging sample counts, win/loss distributions, and average payoff ratios so you can see if textbook patterns actually hold up in the wild.
+
+---
+
+## Paper Trading Simulation Engine
+
+TRAI includes a realistic paper trading environment designed around the fee structures and execution rules of Indian retail brokerages (Zerodha / Groww).
+
+### Key Simulation Mechanics
+- **Virtual Balance**: Defaults to ₹10,00,000 (10 Lakhs INR) with support for full account resets.
+- **Order Types**:
+  - `MARKET`: Instant fill at current market price.
+  - `LIMIT`: Pending order filled when market trades through the target price.
+  - `SL` / `SL-M`: Stop-loss orders triggered by price threshold breaches.
+  - `GTT` (Good Till Triggered): Standing trigger order that executes when conditions are met.
+- **Product Types**: `CNC` (Cash & Carry for swing/delivery) and `INTRADAY` (MIS with margin).
+- **Realistic Brokerage & Statutory Taxes**:
+  - Brokerage: 0.03% or ₹20 flat cap per order (whichever is lower).
+  - Securities Transaction Tax (STT): 0.1% on delivery buy/sell; 0.025% on intraday sell.
+  - Exchange Turnover Charges, SEBI Regulatory Fees, Stamp Duty, and 18% GST on brokerage + turnover fees.
 - **Autonomous Execution Agent**:
-  - Configurable trade automation with customizable strategy sources (`PRE_MARKET`, `LIVE_ALGO`, `POST_MARKET`, `LEARNER_AGENT`, `CUSTOM`).
-  - Strict capital guardrails: Maximum cash allocation limits, max allocation per trade percentage, max concurrent positions, minimum confidence thresholds, and symbol whitelisting.
-- **Portfolio Analytics & Replay**:
-  - Realized and unrealized P&L tracking, win rate, profit factor, average win/loss, and portfolio equity curve.
-  - Time Machine simulation: Replay past trading dates to backtest execution logic against historical price action.
-  - Persistent state saved to `paper_state.json` with manual reset capability.
-
-### 5. Algo Academy & Pattern Lab (`/algo-academy`)
-- **Quantitative Strategy Catalog**: Institutional documentation of quantitative trading patterns, including:
-  - Institutional VWAP Pullback Alpha
-  - Opening Range Breakout (ORB)
-  - Liquidity Sweep & Order Block Reversal
-  - EMA Ribbon Trend Ride (9/21/50)
-  - Bollinger Band Mean Reversion Squeeze
-  - Relative Volume (RVOL) Breakout
-  - Multi-Timeframe Confluence Trend
-  - Wyckoff Spring & Accumulation Breakout
-- **Visual Pattern Canvas**: High-fidelity SVG setups comparing textbook theoretical patterns directly against real historical market candlestick executions.
-- **Observational Learning Engine**: Live and historical pattern detection across tracked NSE equities, displaying historical sample counts, win-rate percentages, and average payoff ratios.
+  - Optional automated trading agent that executes signals generated by the scanner or pattern observer.
+  - Guardrails include: maximum total capital allocation, max allocation per trade, max open positions, minimum confidence thresholds, and symbol whitelists.
+- **Time Machine Replay**: Step the simulation back to historical trading days to evaluate how order matching and strategies would have performed under historical market conditions.
+- **Persistence**: All orders, positions, charges paid, and the portfolio equity curve are stored in `paper_state.json`.
 
 ---
 
-## Performance & Frontend Engineering
+## Technical Architecture & Design Decisions
 
-- **Route-Level Code Splitting**: All primary pages (`StockPage`, `AICommandCenter`, `PaperTrading`, `AlgoAcademy`) are loaded as independent dynamic chunks using `React.lazy` and `React.Suspense`, keeping the initial bundle size under 475 kB.
-- **Intent-Based Prefetching**: Navigation links preload chunk assets on pointer hover (`onMouseEnter`), eliminating transition latency when changing views.
-- **SWR Query Caching & Request Deduplication**: In-flight HTTP requests are deduplicated and cached with stale-while-revalidate policies, preventing duplicate network traffic during rapid tab switches.
-- **Page Visibility Gating**: Real-time polling automatically pauses when the browser tab is minimized or out of focus via the Page Visibility API (`document.hidden`), resuming instantly upon refocus.
-- **Error Boundary Fallbacks**: Isolated `RouteErrorBoundary` catches route-level chunk or network exceptions and displays a recovery interface without crashing the global application shell.
-- **Mobile Ergonomics**: Input elements enforce a minimum 16px font size on viewports under 768px to prevent iOS auto-zoom, and all interactive targets adhere to a minimum 36px touch bounding box.
+### System Overview
 
----
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Client Layer (React 19)                │
+│                                                             │
+│   [Market Overview]   [Stock Charting]   [AI Scanner]       │
+│   [Paper Terminal]    [Algo Academy]     [Nifty Modal]      │
+│                                                             │
+│   • TradingView Lightweight Charts (Canvas rendering)       │
+│   • Client-side SWR Cache & Deduplication (queryCache.js)   │
+│   • Page Visibility Gating (usePageVisibility.js)           │
+│   • Route-level Code Splitting (React.lazy + Suspense)       │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ HTTP / JSON (Port 5500)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Server Layer (Flask)                   │
+│                                                             │
+│   [app.py]              REST API routing & response caching │
+│   [analysis_engine.py]  Technical indicators, pandas, numpy │
+│   [paper_trading.py]    Order book, tax math, matching loop │
+│   [algo_kb.py]          Pattern library & observation feed  │
+│                                                             │
+│   • In-memory quotes cache + JSON state persistence         │
+│   • Background tick evaluation for pending orders           │
+│   • Data ingestion via yfinance API                         │
+└─────────────────────────────────────────────────────────────┘
+```
 
-## Technology Stack
+### Engineering Decisions
 
-| Layer | Technologies |
-|---|---|
-| **Backend** | Python 3.13, Flask 3.0, Flask-CORS, Gunicorn, yfinance, pandas, numpy |
-| **Frontend** | React 19, Vite 8, TradingView Lightweight Charts 5.2, Lucide React 1.66 |
-| **Styling** | Semantic CSS Variables (Institutional Dark Theme), Flexbox/Grid, SVG graphics |
-| **Tooling & Linter**| Oxlint, Node.js 24 |
+1. **Canvas-Based Charting over SVG**:
+   We use TradingView's Lightweight Charts instead of generic charting libraries (Recharts/Chart.js) for the primary stock page. Canvas rendering avoids thousands of DOM nodes during multi-year candle scrubbing, maintaining 60 FPS performance even on low-end hardware.
+
+2. **Route-Level Code Splitting**:
+   All major views (`StockPage`, `AICommandCenter`, `PaperTrading`, `AlgoAcademy`) are loaded as independent lazy chunks. The initial client bundle is kept under 475 kB, well below Vite's 500 kB warning threshold.
+
+3. **Client-Side SWR Caching & Request Deduplication**:
+   When switching between views or changing filter tabs, `queryCache.js` returns cached data immediately while revalidating in the background. Concurrent requests for the same batch quotes or historical series share an in-flight Promise to avoid flooding the backend with duplicate HTTP calls.
+
+4. **Page Visibility Gating**:
+   Real-time quote polling pauses when the browser tab is hidden or minimized (`document.hidden`). As soon as the user refocuses the tab, `usePageVisibility` triggers an immediate sync. This prevents unnecessary background network requests and reduces CPU/battery usage.
+
+5. **Route Error Boundary**:
+   Route loading failures (such as temporary network interruptions during a dynamic chunk download) are caught by `RouteErrorBoundary`, providing a clean "Retry Loading" action instead of breaking the entire application shell.
 
 ---
 
 ## Project Structure
 
 ```
-trader-view/
-├── requirements.txt            # Python dependencies
-├── Procfile                    # Production process definition (Gunicorn)
-├── render.yaml                 # Cloud deployment specification
-├── nse-dashboard/              # Backend service
-│   ├── app.py                  # Flask REST API and route handlers
-│   ├── analysis_engine.py      # Technical indicator and scanner calculation engine
-│   ├── paper_trading.py        # Order matching engine and broker tax simulation
-│   ├── algo_kb.py              # Quantitative pattern catalog and observation feed
-│   ├── paper_state.json        # Persistent paper trading database state
-│   ├── quotes_cache.json       # In-memory quote cache
-│   └── real_candles_cache.json # Historical candlestick cache
-└── frontend/                   # Frontend SPA
-    ├── package.json            # Node.js dependencies and build scripts
-    ├── vite.config.js          # Vite build configuration with proxy rules
-    ├── index.html              # HTML entry point
+.
+├── requirements.txt            # Python dependencies (Flask, pandas, yfinance, etc.)
+├── Procfile                    # Deployment process configuration (Gunicorn)
+├── render.yaml                 # Cloud deployment template
+├── nse-dashboard/              # Python Flask backend
+│   ├── app.py                  # API endpoints, request routing, cache management
+│   ├── analysis_engine.py      # Indicator calculations, trend scoring, setup generator
+│   ├── paper_trading.py        # Order matching engine, tax calculator, state store
+│   ├── algo_kb.py              # Algorithmic pattern blueprints and observation feed
+│   ├── paper_state.json        # Persistent paper trading database
+│   ├── quotes_cache.json       # In-memory quote cache file
+│   └── real_candles_cache.json # Historical candlestick cache file
+└── frontend/                   # React 19 single-page application
+    ├── package.json            # Node.js dependencies and scripts
+    ├── vite.config.js          # Vite config with API reverse proxy
+    ├── index.html              # App entry point
     └── src/
-        ├── main.jsx            # Application bootstrap
-        ├── App.jsx             # Shell router, code splitting, visibility sync
-        ├── index.css           # Global typography, color tokens, scrollbars
+        ├── main.jsx            # React root mount
+        ├── App.jsx             # Shell routing, lazy loading, visibility sync
+        ├── index.css           # Institutional dark theme tokens, layout rules
         ├── components/
-        │   ├── Navbar.jsx              # Navigation header, search, market ticker
-        │   ├── Footer.jsx              # Footer telemetry and status
+        │   ├── Navbar.jsx              # Header, search bar, route preloading
+        │   ├── Footer.jsx              # Footer status indicators and links
         │   ├── MarketOverview.jsx      # Dashboard, sector heatmap, stock screener
-        │   ├── StockPage.jsx           # TradingView candlestick charts & indicators
-        │   ├── AICommandCenter.jsx     # Quantitative scanner and multi-agent setups
-        │   ├── PaperTrading.jsx        # Virtual broker terminal and order book
-        │   ├── AlgoAcademy.jsx         # Strategy pattern visualizer and learner feed
+        │   ├── StockPage.jsx           # Candlestick charts, indicator overlays
+        │   ├── AICommandCenter.jsx     # Multi-agent scanner and setup cards
+        │   ├── PaperTrading.jsx        # Paper trading terminal, order entry, journal
+        │   ├── AlgoAcademy.jsx         # Pattern lab, SVG visualizer, observer feed
         │   ├── NiftyModal.jsx          # Benchmark index detailed modal view
-        │   └── RouteErrorBoundary.jsx  # Route exception containment boundary
+        │   └── RouteErrorBoundary.jsx  # Route crash isolation fallback
         ├── hooks/
         │   └── usePageVisibility.js    # Tab visibility gating hook
         └── utils/
-            ├── preloadChunks.js        # Dynamic import prefetching utility
-            └── queryCache.js           # Client-side SWR caching utility
+            ├── preloadChunks.js        # Intent-based prefetch helper
+            └── queryCache.js           # SWR query cache and deduplication
 ```
 
 ---
 
 ## API Reference
 
-The Flask backend serves REST endpoints on port `5500`:
+The Flask backend runs on `http://localhost:5500` and exposes the following endpoints:
 
-| Method | Endpoint | Description |
+| Method | Route | Description |
 |---|---|---|
-| `GET` | `/api/health` | Health check endpoint returning backend status. |
-| `GET` | `/api/stocks` | List of all 30 tracked NSE equities with sector mappings. |
-| `GET` | `/api/sectors` | Sector definitions and assigned ticker symbols. |
-| `GET` | `/api/quote/<symbol>` | Real-time quote, day range, volume, and previous close. |
-| `GET` | `/api/batch_quotes?symbols=...` | Comma-delimited batch quote fetching for market screener. |
+| `GET` | `/api/health` | Service health status. |
+| `GET` | `/api/stocks` | List of all 30 tracked NSE equities with sector metadata. |
+| `GET` | `/api/sectors` | Sector definitions and assigned equity symbols. |
+| `GET` | `/api/quote/<symbol>` | Current quote, day high/low, volume, and percentage change. |
+| `GET` | `/api/batch_quotes?symbols=...` | Comma-separated batch quote lookup for table feeds. |
 | `GET` | `/api/history/<symbol>?range=1mo&interval=1d` | Historical OHLCV candle arrays for charting. |
-| `GET` | `/api/compare?symbols=...` | Normalized percentage-change data for comparative overlays. |
-| `GET` | `/api/market_summary` | Aggregate market snapshot, advance/decline ratio, and top movers. |
-| `GET` | `/api/analysis/scan` | Broad market quantitative scan across all tracked assets. |
-| `GET` | `/api/analysis/news/<symbol>` | News feed and sentiment score for a specific ticker. |
-| `GET` | `/api/analysis/historical/<symbol>` | Support/resistance levels and trend analysis. |
-| `GET` | `/api/analysis/strategy/<symbol>` | Calculated strategy setups with target and stop-loss levels. |
-| `GET` | `/api/analysis/full/<symbol>` | Consolidated analysis report combining news, history, and strategy. |
-| `GET` | `/api/analysis/live/<symbol>` | Intraday momentum scoring and live technical indicators. |
-| `GET` | `/api/algos` | Full directory of quantitative algorithm blueprints. |
-| `GET` | `/api/algos/observed` | Real-time pattern detections recorded across NSE symbols. |
-| `GET` | `/api/algos/<algo_id>` | Detailed specification and setup rules for a pattern. |
-| `GET` | `/api/paper/summary` | Virtual account balance, positions, orders, and P&L metrics. |
-| `POST`| `/api/paper/order` | Place a new virtual order (`symbol`, `qty`, `side`, `type`, `price`). |
-| `POST`| `/api/paper/cancel_order` | Cancel an unexecuted pending order by `order_id`. |
-| `GET` | `/api/paper/agent_config` | Fetch autonomous execution agent configuration and limits. |
-| `POST`| `/api/paper/agent_config` | Update agent execution parameters and risk rules. |
+| `GET` | `/api/compare?symbols=...` | Normalized percentage-change series for asset comparisons. |
+| `GET` | `/api/market_summary` | Aggregate market snapshot, advance/decline ratio, top movers. |
+| `GET` | `/api/analysis/scan` | Full quantitative scan across all tracked equities. |
+| `GET` | `/api/analysis/news/<symbol>` | Scraped news feed with sentiment classification. |
+| `GET` | `/api/analysis/historical/<symbol>` | Support/resistance levels and trend structure. |
+| `GET` | `/api/analysis/strategy/<symbol>` | Algorithmic setups with target and stop-loss levels. |
+| `GET` | `/api/analysis/full/<symbol>` | Consolidated analysis combining news, structure, and setups. |
+| `GET` | `/api/analysis/live/<symbol>` | Real-time technical indicators and intraday momentum score. |
+| `GET` | `/api/algos` | Complete catalog of algorithmic pattern blueprints. |
+| `GET` | `/api/algos/observed` | Live and historical pattern detections recorded across NSE symbols. |
+| `GET` | `/api/algos/<algo_id>` | Detailed specification and setup criteria for a specific pattern. |
+| `GET` | `/api/paper/summary` | Account cash, equity curve, open positions, and trade history. |
+| `POST`| `/api/paper/order` | Place an order (`symbol`, `qty`, `side`, `type`, `price`, `stop_loss`, `target`). |
+| `POST`| `/api/paper/cancel_order` | Cancel a pending order by `order_id`. |
+| `GET` | `/api/paper/agent_config` | Fetch autonomous execution agent risk parameters. |
+| `POST`| `/api/paper/agent_config` | Update agent risk rules and strategy filters. |
 | `POST`| `/api/paper/auto_execute` | Trigger agent evaluation cycle against active market signals. |
-| `POST`| `/api/paper/simulate_date` | Step the virtual engine to a historical date for replay. |
-| `POST`| `/api/paper/reset` | Reset virtual balance, positions, and history to defaults. |
+| `POST`| `/api/paper/simulate_date` | Step the simulation engine to a historical date. |
+| `POST`| `/api/paper/reset` | Reset virtual account balance, positions, and history. |
 
 ---
 
-## Getting Started
+## Local Setup & Development
 
-### Prerequisites
-- **Python**: Version 3.11 or higher (3.13 recommended)
-- **Node.js**: Version 20 or higher (v24 LTS recommended)
+### Requirements
+- **Python**: 3.11 or higher (tested on Python 3.13)
+- **Node.js**: 20 LTS or higher (tested on Node 24)
 - **Package Managers**: `pip` and `npm`
 
-### 1. Backend Setup
-
+### Step 1: Clone the Repository
 ```bash
-# Clone the repository
 git clone https://github.com/your-username/trader-view.git
 cd trader-view
+```
 
+### Step 2: Set Up the Backend
+```bash
 # Create and activate virtual environment
 python -m venv .venv
 
-# Windows
+# Windows (PowerShell)
 .venv\Scripts\activate
 
 # Linux / macOS
@@ -222,17 +213,14 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Start Flask backend server
+# Run the Flask backend
 python nse-dashboard/app.py
 ```
-The backend service will start on `http://localhost:5500`.
+The backend will start on `http://localhost:5500`.
 
-### 2. Frontend Setup
-
-In a separate terminal window:
-
+### Step 3: Set Up the Frontend
+Open a separate terminal window:
 ```bash
-# Navigate to frontend directory
 cd frontend
 
 # Install Node dependencies
@@ -241,22 +229,22 @@ npm install
 # Start Vite development server
 npm run dev
 ```
-The frontend application will start on `http://localhost:5173` with automatic proxying of `/api/*` requests to the Flask server on port 5500.
+The frontend dev server will start on `http://localhost:5173`. The Vite server is configured to proxy all `/api/*` calls directly to the Flask backend on port 5500.
 
-### 3. Production Build
+---
 
-To verify and produce an optimized client production bundle:
+## Production Deployment
 
+### Building the Frontend
+To build the optimized static production bundle:
 ```bash
 cd frontend
 npm run build
 ```
-Compiled production assets will be output to `frontend/dist/`. To preview the production bundle locally:
-```bash
-npm run preview
-```
+Vite compiles all assets into `frontend/dist/`.
 
-To run the backend with Gunicorn in production environments:
+### Running the Backend with Gunicorn
+For production Linux environments, use Gunicorn with multiple workers and threads:
 ```bash
 gunicorn --chdir nse-dashboard app:app --bind 0.0.0.0:5500 --workers 2 --threads 4 --timeout 120
 ```
@@ -265,20 +253,20 @@ gunicorn --chdir nse-dashboard app:app --bind 0.0.0.0:5500 --workers 2 --threads
 
 ## Tracked Instruments
 
-The default watchlist monitors major large-cap and mid-cap NSE equities across key economic sectors:
+TRAI currently tracks 30 representative liquid equities across primary sectors on the National Stock Exchange of India, plus core benchmark indices:
 
 - **Information Technology**: TCS, INFY, WIPRO, HCLTECH, TECHM
-- **Banking & Financials**: HDFCBANK, ICICIBANK, SBIN, KOTAKBANK, AXISBANK
+- **Banking & Finance**: HDFCBANK, ICICIBANK, SBIN, KOTAKBANK, AXISBANK
 - **Energy & Utilities**: RELIANCE, ONGC, NTPC, POWERGRID, BPCL
 - **Automotive**: TATAMOTORS, MARUTI, M&M, BAJAJ-AUTO
-- **Consumer & FMCG**: HINDUNILVR, ITC, NESTLEIND, BRITANNIA
+- **Consumer Goods & FMCG**: HINDUNILVR, ITC, NESTLEIND, BRITANNIA
 - **Pharmaceuticals**: SUNPHARMA, DRREDDY, CIPLA
 - **Metals & Mining**: TATASTEEL, JSWSTEEL, HINDALCO
 - **Infrastructure & Conglomerates**: LT, ADANIENT
-- **Market Indices**: NIFTY 50 (`^NSEI`), NIFTY BANK (`^NSEBANK`)
+- **Benchmark Indices**: NIFTY 50 (`^NSEI`), NIFTY BANK (`^NSEBANK`)
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
