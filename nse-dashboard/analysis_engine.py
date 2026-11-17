@@ -608,8 +608,7 @@ def full_analysis(symbol, stock_dict):
     e9 = calc_ema(c, 9)
     e21 = calc_ema(c, 21)
     e50 = calc_ema(c, 50) if len(c) >= 50 else pd.Series(dtype=float)
-    vw = calc_vwap(h_s, l_s, c, vol)
-    rs = calc_rsi(c)
+    # Daily OHLCV cannot provide a true session VWAP; do not plot a misleading cumulative proxy.\n    vw = None\n    rs = calc_rsi(c)
     ml, ms_l, mh_s = calc_macd(c)
     bbu, _, bbl = calc_bollinger(c)
 
