@@ -383,37 +383,10 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
     );
   };
 
-  // ── RIGHT ROW: Recorded Instances Activity Graph ──
+  // ── Observed signal frequency graph (only real API data) ──
   const renderInstanceGraph = () => {
-    const timeline = Array.isArray(observedData?.timeline) && observedData.timeline.length > 0 
-      ? observedData.timeline 
-      : (timeframe === '1D' 
-          ? [
-              { label: '09:30', count: 2 },
-              { label: '10:30', count: 1 },
-              { label: '11:30', count: 2 },
-              { label: '12:30', count: 1 },
-              { label: '13:30', count: 1 },
-              { label: '14:30', count: 2 },
-            ]
-          : (timeframe === '1W'
-              ? [
-                  { label: 'Mon', count: 4 },
-                  { label: 'Tue', count: 5 },
-                  { label: 'Wed', count: 4 },
-                  { label: 'Thu', count: 6 },
-                  { label: 'Fri', count: 5 },
-                ]
-              : [
-                  { label: 'W1', count: 12 },
-                  { label: 'W2', count: 15 },
-                  { label: 'W3', count: 11 },
-                  { label: 'W4', count: 14 },
-                ]
-            )
-        );
-
-    const counts = timeline.map(t => Number(t.count) || 1);
+    const timeline = Array.isArray(observedData?.timeline) ? observedData.timeline : [];
+    const counts = timeline.map(item => Math.max(0, Number(item.count) || 0));
     const maxCount = Math.max(...counts, 1);
     const height = 65;
 
@@ -422,39 +395,29 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #888888)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Activity size={12} color="var(--accent, #00d4aa)" />
-            <span>Signal Frequency Distribution ({timeframe})</span>
+            <span>Detected pattern frequency ({timeframe})</span>
           </div>
-          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--green, #2ed573)' }}>
-            {observedData.stats?.win_rate ?? 72.4}% Win Rate
-          </span>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #888888)' }}>Historical detections only</span>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: `${height}px`, gap: '6px', paddingTop: '6px' }}>
-          {timeline.map((item, idx) => {
-            const c = Number(item.count) || 0;
-            const barHeight = Math.max(8, (c / maxCount) * (height - 20));
-            return (
-              <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--accent, #00d4aa)', marginBottom: '2px', fontFamily: 'monospace' }}>
-                  {c}
-                </span>
-                <div 
-                  style={{ 
-                    width: '100%', 
-                    maxWidth: '30px', 
-                    height: `${barHeight}px`, 
-                    background: 'linear-gradient(180deg, var(--accent, #00d4aa) 0%, rgba(0, 212, 170, 0.3) 100%)',
-                    borderRadius: '4px 4px 1px 1px',
-                    transition: 'height 0.3s ease'
-                  }} 
-                />
-                <span style={{ fontSize: '0.64rem', color: 'var(--text-muted, #888888)', marginTop: '2px', whiteSpace: 'nowrap' }}>
-                  {item.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+        {timeline.length === 0 ? (
+          <div style={{ height: '65px', display: 'grid', placeItems: 'center', color: 'var(--text-muted, #888888)', fontSize: '0.75rem' }}>
+            No confirmed detections in this period
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: `${height}px`, gap: '6px', paddingTop: '6px' }}>
+            {timeline.map((item, idx) => {
+              const count = Math.max(0, Number(item.count) || 0);
+              const barHeight = count > 0 ? Math.max(4, (count / maxCount) * (height - 20)) : 0;
+              return (
+                <div key={item.label || idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--accent, #00d4aa)', marginBottom: '2px', fontFamily: 'monospace' }}>{count}</span>
+                  <div style={{ width: '100%', maxWidth: '30px', height: `${barHeight}px`, background: 'linear-gradient(180deg, var(--accent, #00d4aa) 0%, rgba(0, 212, 170, 0.3) 100%)', borderRadius: '4px 4px 1px 1px' }} />
+                  <span style={{ fontSize: '0.64rem', color: 'var(--text-muted, #888888)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
@@ -872,8 +835,8 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                 const isStoppedOut = sig.status === 'Stopped Out';
                 const statusBg = isTargetHit ? 'rgba(46, 213, 115, 0.12)' : (isStoppedOut ? 'rgba(255, 71, 87, 0.12)' : 'rgba(0, 212, 170, 0.12)');
                 const statusColor = isTargetHit ? 'var(--green, #2ed573)' : (isStoppedOut ? 'var(--red, #ff4757)' : 'var(--accent, #00d4aa)');
-                const sigPrice = typeof sig.price === 'number' ? sig.price : 0;
-                const returnPct = typeof sig.return_pct === 'number' ? sig.return_pct : 0;
+                const sigPrice = typeof sig.price === 'number' ? sig.price : null;
+                const returnPct = typeof sig.return_pct === 'number' ? sig.return_pct : null;
 
                 return (
                   <div
@@ -946,7 +909,7 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                           flexShrink: 0,
                           whiteSpace: 'nowrap'
                         }}>
-                          {sig.status} ({returnPct > 0 ? '+' : ''}{returnPct}%)
+                          {sig.status}{returnPct !== null ? ` (${returnPct > 0 ? '+' : ''}${returnPct}%)` : ''}
                         </span>
                       </div>
 
@@ -956,11 +919,11 @@ export default function AlgoAcademy({ highlightedAlgoId, onSelectAlgoForTrading 
                           <Clock size={11} />
                           <span>{sig.timestamp}</span>
                           <span>•</span>
-                          <span style={{ color: 'var(--text-main, #d1d5db)' }}>Trigger: <strong style={{ color: '#ffffff', fontFamily: 'monospace' }}>₹{sigPrice.toLocaleString('en-IN', { minimumFractionDigits: 1 })}</strong></span>
+                          <span style={{ color: 'var(--text-main, #d1d5db)' }}>Trigger: <strong style={{ color: '#ffffff', fontFamily: 'monospace' }}>{sigPrice !== null ? `₹${sigPrice.toLocaleString('en-IN', { minimumFractionDigits: 1 })}` : 'N/A'}</strong></span>
                         </div>
 
                         <div style={{ fontWeight: 600, color: 'var(--accent, #00d4aa)', flexShrink: 0 }}>
-                          Score: {sig.confidence || 75}%
+                          Score: {typeof sig.confidence === 'number' ? `${sig.confidence}%` : 'N/A'}
                         </div>
                       </div>
                     </div>
