@@ -451,7 +451,11 @@ ALGO_DIRECTORY = {
     }
 }
 
-# ── 6-Week & Today's Observed Signal Feed Generator ──────────────────────────
+# ── Observed Signal Feed: derived only from actual Yahoo Finance OHLCV ───────
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+import yfinance as yf
+import pandas as pd
 
 NSE_TICKERS = [
     "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
@@ -460,261 +464,221 @@ NSE_TICKERS = [
     "BAJFINANCE.NS", "TATASTEEL.NS", "POWERGRID.NS", "NTPC.NS"
 ]
 
-_REAL_CANDLES_CACHE = None
+_HISTORY_CACHE = {}
+_HISTORY_CACHE_TTL = 900
+_OBSERVED_CACHE = {"timestamp": 0, "signals": []}
+_OBSERVED_CACHE_TTL = 300
+_CACHE_LOCK = __import__("threading").RLock()
 
-def load_real_candles_cache():
-    global _REAL_CANDLES_CACHE
-    if _REAL_CANDLES_CACHE is None:
-        cache_path = os.path.join(os.path.dirname(__file__), "real_candles_cache.json")
-        if os.path.exists(cache_path):
-            try:
-                with open(cache_path, "r", encoding="utf-8") as f:
-                    _REAL_CANDLES_CACHE = json.load(f)
-            except Exception:
-                _REAL_CANDLES_CACHE = {}
-        else:
-            _REAL_CANDLES_CACHE = {}
-    return _REAL_CANDLES_CACHE
 
-def is_nse_market_closed():
-    """
-    NSE Indian market hours: 09:15 to 15:30 IST (+05:30), Mon-Fri.
-    """
-    utc_now = datetime.utcnow()
-    ist_now = utc_now + timedelta(hours=5, minutes=30)
-    if ist_now.weekday() >= 5:
-        return True
-    mins = ist_now.hour * 60 + ist_now.minute
-    # 09:15 is 555, 15:30 is 930
-    return mins >= 930 or mins < 555
+def _get_real_chart(symbol):
+    """Fetch and normalize real daily OHLCV; cache briefly to limit upstream requests."""
+    now = time.time()
+    with _CACHE_LOCK:
+        cached = _HISTORY_CACHE.get(symbol)
+        if cached and now - cached["timestamp"] < _HISTORY_CACHE_TTL:
+            return cached["chart"]
 
-def get_market_session_status():
-    closed = is_nse_market_closed()
-    if closed:
-        return {
-            "is_closed": True,
-            "session_badge": "Market Closed • Patterns Captured",
-            "message": "Market session closed. All algorithmic patterns formed on the completed trading session are captured and finalized.",
-            "data_source": "EOD Finalized"
-        }
-    else:
-        return {
-            "is_closed": False,
-            "session_badge": "Market in Session (No Intraday Updates)",
-            "message": "Market is currently in session. Algorithmic patterns trigger updates only once the market closes at 15:30 IST. Showing confirmed patterns from the previous completed session.",
-            "data_source": "Previous Trading Session"
-        }
+    try:
+        hist = yf.Ticker(symbol).history(period="3mo", interval="1d", auto_adjust=False)
+        if hist is None or hist.empty:
+            return []
+        hist = hist.dropna(subset=["Open", "High", "Low", "Close"])
+        if hist.empty:
+            return []
 
-def generate_real_pattern_slice(symbol, algo_id, is_win, status, ret_pct, day_offset=0):
-    """
-    Extracts authentic real historical market candlestick records directly from NSE data.
-    """
-    cache = load_real_candles_cache()
-    symbol_candles = cache.get(symbol, [])
-    
-    if len(symbol_candles) >= 12:
-        end_idx = max(12, len(symbol_candles) - (day_offset % max(1, len(symbol_candles) - 11)))
-        start_idx = max(0, end_idx - 12)
-        slice_bars = symbol_candles[start_idx:end_idx]
-    elif len(symbol_candles) > 0:
-        slice_bars = symbol_candles
-    else:
-        # Fallback if ticker cache missing
-        slice_bars = [{"date": "Recent", "o": 1200.0, "h": 1215.0, "l": 1195.0, "c": 1210.0, "v": 150000}]
+        close = hist["Close"]
+        ema9 = close.ewm(span=9, adjust=False).mean()
+        ema21 = close.ewm(span=21, adjust=False).mean()
+        typical = (hist["High"] + hist["Low"] + close) / 3
+        volume = hist["Volume"].fillna(0)
+        cumulative_volume = volume.cumsum().replace(0, float("nan"))
+        vwap = (typical * volume).cumsum() / cumulative_volume
 
-    candles = []
-    indicator_vals = []
-    
-    closes = [b["c"] for b in slice_bars]
-    k = 2.0 / (5.0 + 1.0)
+        chart = []
+        for i, (ts, row) in enumerate(hist.iterrows()):
+            values = [row["Open"], row["High"], row["Low"], row["Close"]]
+            if any(pd.isna(v) for v in values):
+                continue
+            chart.append({
+                "date": ts.strftime("%Y-%m-%d"),
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": float(row["Close"]),
+                "volume": int(row["Volume"]) if not pd.isna(row["Volume"]) else 0,
+                "ema9": float(ema9.iloc[i]) if not pd.isna(ema9.iloc[i]) else None,
+                "ema21": float(ema21.iloc[i]) if not pd.isna(ema21.iloc[i]) else None,
+                "vwap": float(vwap.iloc[i]) if not pd.isna(vwap.iloc[i]) else None,
+            })
+        with _CACHE_LOCK:
+            _HISTORY_CACHE[symbol] = {"timestamp": now, "chart": chart}
+        return chart
+    except Exception as exc:
+        print(f"[algo-feed] {symbol} history unavailable: {exc}")
+        return []
+
+
+def _make_observed_signal(symbol, chart, pattern, index):
+    """Build a chart overlay from the exact historical bars that formed the pattern."""
+    window_start = max(0, index - 11)
+    bars = chart[window_start:index + 1]
+    if not bars:
+        return None
+    candles = [{"date": b["date"], "o": b["open"], "h": b["high"],
+                "l": b["low"], "c": b["close"]} for b in bars]
+    closes = [b["close"] for b in bars]
+    ema_values = []
     ema = closes[0]
-    for b in slice_bars:
-        c = b["c"]
-        ema = c * k + ema * (1.0 - k)
-        indicator_vals.append(round(ema, 2))
-        candles.append({
-            "date": b.get("date", ""),
-            "o": b["o"],
-            "h": b["h"],
-            "l": b["l"],
-            "c": b["c"]
-        })
+    alpha = 2 / 6
+    for value in closes:
+        ema = value * alpha + ema * (1 - alpha)
+        ema_values.append(round(ema, 2))
 
-    trigger_idx = min(len(candles) - 1, max(3, len(candles) - 3))
-    entry_p = candles[trigger_idx]["c"]
-    swing_low = min(c["l"] for c in candles[:trigger_idx + 1])
-    sl_p = round(min(entry_p * 0.985, swing_low * 0.995), 2)
-    tp_p = round(entry_p * (1.0 + (abs(ret_pct) / 100.0) if is_win else 1.025), 2)
+    entry = float(pattern.get("price") or candles[-1]["c"])
+    recent_lows = [b["l"] for b in bars[-5:]]
+    recent_highs = [b["h"] for b in bars[-5:]]
+    risk = max(entry - min(recent_lows), entry * 0.005)
+    stop = round(entry - risk, 2)
+    target = round(entry + risk * 2, 2)
+    algo_id = pattern.get("algo_id", "")
+    algo = ALGO_DIRECTORY.get(algo_id, {})
+    date = pattern.get("date") or bars[-1]["date"]
+    try:
+        days_ago = max(0, (datetime.now().date() - datetime.strptime(date, "%Y-%m-%d").date()).days)
+    except Exception:
+        days_ago = 0
 
     return {
-        "symbol": symbol,
-        "clean_symbol": symbol.replace(".NS", ""),
+        "id": f"{symbol}-{algo_id}-{date}",
         "algo_id": algo_id,
-        "trigger_index": trigger_idx,
-        "entry_price": entry_p,
-        "stop_loss": sl_p,
-        "target_price": tp_p,
-        "status": status,
-        "candles": candles,
-        "indicator_line": {
-            "name": "5-EMA Indicator",
-            "values": indicator_vals
-        }
+        "algo_name": algo.get("name", pattern.get("name", "Market Pattern")),
+        "category": algo.get("category", "Price Action & Structure"),
+        "symbol": symbol,
+        "stock_clean": symbol.replace(".NS", ""),
+        "timestamp": date,
+        "date": date,
+        "is_today": days_ago == 0,
+        "days_ago": days_ago,
+        "price": round(entry, 2),
+        "confidence": None,
+        "status": "Detected",
+        "return_pct": None,
+        "badge": pattern.get("badge", "Technical Pattern"),
+        "explanation": pattern.get("explanation", ""),
+        "real_chart": {
+            "symbol": symbol,
+            "clean_symbol": symbol.replace(".NS", ""),
+            "algo_id": algo_id,
+            "entry_price": round(entry, 2),
+            "stop_loss": stop,
+            "target_price": target,
+            "status": "Detected",
+            "candles": candles,
+            "indicator_line": {"name": "5-period EMA", "values": ema_values},
+        },
     }
 
+
 def generate_observed_signals():
-    random.seed(42)
-    now = datetime.now()
+    """Scan real daily OHLCV; never fabricate prices, wins, confidence or trade outcomes."""
+    by_symbol = {}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = {pool.submit(_get_real_chart, symbol): symbol for symbol in NSE_TICKERS}
+        for future in as_completed(futures):
+            symbol = futures[future]
+            try:
+                by_symbol[symbol] = future.result()
+            except Exception as exc:
+                print(f"[algo-feed] {symbol} scan failed: {exc}")
+                by_symbol[symbol] = []
+
     signals = []
-    algo_keys = list(ALGO_DIRECTORY.keys())
-    
-    # 1. Closed Session / Today Observations
-    today_times = ["09:25", "09:40", "10:15", "10:50", "11:30", "12:15", "13:20", "14:10", "14:45"]
-    for i, t in enumerate(today_times):
-        sym = NSE_TICKERS[i % len(NSE_TICKERS)]
-        algo_id = algo_keys[i % len(algo_keys)]
-        algo = ALGO_DIRECTORY[algo_id]
-        
-        ret_pct = round(random.uniform(0.8, 3.4), 2)
-        confidence = random.randint(78, 94)
-        status = "Target Hit" if ret_pct > 1.5 else "Active"
-        
-        real_chart = generate_real_pattern_slice(sym, algo_id, True, status, ret_pct, day_offset=0)
-        base_price = real_chart["entry_price"]
-        
-        signals.append({
-            "id": f"obs-today-{i+1}",
-            "algo_id": algo_id,
-            "algo_name": algo["name"],
-            "category": algo["category"],
-            "symbol": sym,
-            "stock_clean": sym.replace(".NS", ""),
-            "timestamp": f"{now.strftime('%d %b %Y')} {t}",
-            "is_today": True,
-            "days_ago": 0,
-            "price": base_price,
-            "confidence": confidence,
-            "status": status,
-            "return_pct": ret_pct,
-            "badge": algo["badge"],
-            "real_chart": real_chart
-        })
-
-    # 2. Historical Observations Across Past Weeks
-    for day_offset in range(1, 42):
-        event_date = now - timedelta(days=day_offset)
-        if event_date.weekday() >= 5:
+    for symbol, chart in by_symbol.items():
+        if len(chart) < 5:
             continue
-            
-        num_signals_this_day = random.randint(1, 3)
-        for s_idx in range(num_signals_this_day):
-            sym = random.choice(NSE_TICKERS)
-            algo_id = random.choice(algo_keys)
-            algo = ALGO_DIRECTORY[algo_id]
-            
-            is_win = random.random() < 0.72
-            ret_pct = round(random.uniform(1.2, 4.8), 2) if is_win else -round(random.uniform(0.6, 1.4), 2)
-            time_str = random.choice(["09:30", "10:15", "11:45", "13:10", "14:20"])
-            status = "Target Hit" if is_win else "Stopped Out"
-            
-            real_chart = generate_real_pattern_slice(sym, algo_id, is_win, status, ret_pct, day_offset=day_offset)
-            base_price = real_chart["entry_price"]
-            
-            signals.append({
-                "id": f"obs-hist-{day_offset}-{s_idx}",
-                "algo_id": algo_id,
-                "algo_name": algo["name"],
-                "category": algo["category"],
-                "symbol": sym,
-                "stock_clean": sym.replace(".NS", ""),
-                "timestamp": f"{event_date.strftime('%d %b %Y')} {time_str}",
-                "is_today": False,
-                "days_ago": day_offset,
-                "price": base_price,
-                "confidence": random.randint(70, 92),
-                "status": status,
-                "return_pct": ret_pct,
-                "badge": algo["badge"],
-                "real_chart": real_chart
-            })
-
+        for pattern in detect_algo_patterns(chart):
+            try:
+                idx = next(i for i, bar in enumerate(chart)
+                           if bar["date"] == pattern.get("date"))
+            except StopIteration:
+                continue
+            item = _make_observed_signal(symbol, chart, pattern, idx)
+            if item:
+                signals.append(item)
+    signals.sort(key=lambda item: (item["date"], item["symbol"]), reverse=True)
     return signals
 
-_CACHED_OBSERVED_SIGNALS = None
+
+def get_market_session_status():
+    """NSE session status in Asia/Kolkata, independent of the Render server timezone."""
+    from zoneinfo import ZoneInfo
+    now = datetime.now(ZoneInfo("Asia/Kolkata"))
+    is_weekday = now.weekday() < 5
+    minutes = now.hour * 60 + now.minute
+    in_session = is_weekday and 555 <= minutes < 930
+    return {
+        "is_closed": not in_session,
+        "session_badge": "Market in Session" if in_session else "Market Closed",
+        "message": "Daily patterns are confirmed from completed OHLCV candles; this feed is not tick-by-tick intraday data.",
+        "data_source": "Yahoo Finance daily OHLCV",
+    }
+
 
 def get_observed_feed(filter_type="1D", pattern_id="ALL"):
-    global _CACHED_OBSERVED_SIGNALS
-    if _CACHED_OBSERVED_SIGNALS is None:
-        _CACHED_OBSERVED_SIGNALS = generate_observed_signals()
-        
-    all_signals = _CACHED_OBSERVED_SIGNALS
+    global _OBSERVED_CACHE
+    now = time.time()
+    with _CACHE_LOCK:
+        cache_fresh = now - _OBSERVED_CACHE["timestamp"] < _OBSERVED_CACHE_TTL
+        cached_signals = _OBSERVED_CACHE["signals"]
+    if not cache_fresh:
+        fresh = generate_observed_signals()
+        with _CACHE_LOCK:
+            _OBSERVED_CACHE = {"timestamp": time.time(), "signals": fresh}
+            cached_signals = fresh
+
+    all_signals = cached_signals
     ft_norm = (filter_type or "1D").upper()
-    session_info = get_market_session_status()
+    latest_date = max((s["date"] for s in all_signals), default=None)
+    today = datetime.now().date()
 
     if ft_norm in ("1D", "TODAY"):
-        filtered = [s for s in all_signals if s.get("is_today")]
-        timeline = [
-            {"label": "09:30", "count": 2, "target": 2, "stopped": 0},
-            {"label": "10:30", "count": 1, "target": 1, "stopped": 0},
-            {"label": "11:30", "count": 2, "target": 2, "stopped": 0},
-            {"label": "12:30", "count": 1, "target": 1, "stopped": 0},
-            {"label": "13:30", "count": 1, "target": 1, "stopped": 0},
-            {"label": "14:30", "count": 2, "target": 2, "stopped": 0},
-        ]
+        filtered = [s for s in all_signals if s["date"] == latest_date] if latest_date else []
     elif ft_norm in ("1W", "WEEK"):
-        filtered = [s for s in all_signals if s.get("days_ago", 0) <= 7]
-        timeline = [
-            {"label": "Mon", "count": 4, "target": 3, "stopped": 1},
-            {"label": "Tue", "count": 5, "target": 4, "stopped": 1},
-            {"label": "Wed", "count": 4, "target": 3, "stopped": 1},
-            {"label": "Thu", "count": 6, "target": 5, "stopped": 1},
-            {"label": "Fri", "count": 5, "target": 4, "stopped": 1},
-        ]
+        cutoff = today - timedelta(days=7)
+        filtered = [s for s in all_signals if datetime.strptime(s["date"], "%Y-%m-%d").date() >= cutoff]
     elif ft_norm in ("1M", "MONTH"):
-        filtered = [s for s in all_signals if s.get("days_ago", 0) <= 30]
-        timeline = [
-            {"label": "W1", "count": 12, "target": 9, "stopped": 3},
-            {"label": "W2", "count": 15, "target": 11, "stopped": 4},
-            {"label": "W3", "count": 11, "target": 8, "stopped": 3},
-            {"label": "W4", "count": 14, "target": 10, "stopped": 4},
-        ]
-    else:  # ALL, 6WEEKS
-        filtered = all_signals
-        timeline = [
-            {"label": "W1", "count": 12, "target": 9, "stopped": 3},
-            {"label": "W2", "count": 15, "target": 11, "stopped": 4},
-            {"label": "W3", "count": 11, "target": 8, "stopped": 3},
-            {"label": "W4", "count": 14, "target": 10, "stopped": 4},
-            {"label": "W5", "count": 10, "target": 7, "stopped": 3},
-            {"label": "W6", "count": 5, "target": 4, "stopped": 1},
-        ]
+        cutoff = today - timedelta(days=30)
+        filtered = [s for s in all_signals if datetime.strptime(s["date"], "%Y-%m-%d").date() >= cutoff]
+    else:
+        filtered = list(all_signals)
 
-    # Pattern choice filter
     if pattern_id and pattern_id.upper() != "ALL":
         filtered = [s for s in filtered if s.get("algo_id") == pattern_id or s.get("algo_name") == pattern_id]
 
-    available_patterns = sorted(list(set(s["algo_name"] for s in all_signals)))
+    counts = {}
+    for signal in filtered:
+        label = signal["date"] if ft_norm not in ("1D", "TODAY") else "Latest"
+        counts[label] = counts.get(label, 0) + 1
+    timeline = [{"label": label, "count": count} for label, count in sorted(counts.items())[-8:]]
 
-    today_count = sum(1 for s in all_signals if s.get("is_today"))
-    total_count = len(all_signals)
-    wins = sum(1 for s in filtered if s.get("return_pct", 0) > 0)
-    win_rate = round((wins / len(filtered)) * 100, 1) if filtered else 0.0
-
+    available_patterns = sorted({s["algo_name"] for s in all_signals})
     return {
         "stats": {
-            "total_today": today_count,
-            "total_all": total_count,
+            "total_today": sum(1 for s in all_signals if s["date"] == latest_date) if latest_date else 0,
+            "total_all": len(all_signals),
             "active_filter": ft_norm,
             "active_pattern": pattern_id,
-            "win_rate": win_rate,
+            "win_rate": None,
             "count": len(filtered),
-            "top_algo": "Institutional VWAP Pullback Alpha",
-            "market_session": session_info
+            "top_algo": None,
+            "market_session": get_market_session_status(),
         },
         "available_patterns": available_patterns,
         "timeline": timeline,
-        "signals": filtered
+        "signals": filtered,
     }
+
 
 def detect_algo_patterns(chart_data):
     """
@@ -855,13 +819,6 @@ def detect_algo_patterns(chart_data):
         if len(unique_detected) >= 6:
             break
 
-    # If no formations were detected from basic rules, provide fallback verified patterns
-    if not unique_detected:
-        last_d = chart_data[-1].get("date", "Recent")
-        last_p = chart_data[-1].get("close", 1000)
-        unique_detected = [
-            {"algo_id": "vwap_pullback", "name": "VWAP Trend Defense", "date": last_d, "price": last_p, "badge": "Institutional Defense", "status": "Active"},
-            {"algo_id": "ema_golden_cross", "name": "EMA Dynamic Alignment", "date": last_d, "price": last_p, "badge": "Trend Following", "status": "Active"}
-        ]
+    # No synthetic fallback: an empty result means no qualifying pattern was found.
 
     return unique_detected
