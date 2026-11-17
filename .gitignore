@@ -6,6 +6,7 @@ __pycache__/
 *$py.class
 node_modules/
 .venv/
-
-skills-lock.json
 AGENTS.md
+skills-lock.json
+
+ 
